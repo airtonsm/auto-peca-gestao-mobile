@@ -1,0 +1,53 @@
+{
+  "expo": {
+    "name": "AutoPeça & Gestão",
+    "slug": "auto-peca-gestao-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "gestaomobile",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "br.com.aftecnologia.gestaomobile",
+      "infoPlist": {
+        "NSCameraUsageDescription": "O aplicativo precisa de acesso à câmera para escanear códigos de barras e registrar avarias do veículo.",
+        "NSPhotoLibraryUsageDescription": "O aplicativo precisa de acesso às fotos para anexar imagens de avarias do checklist."
+      }
+    },
+    "android": {
+      "package": "br.com.aftecnologia.gestaomobile",
+      "adaptiveIcon": {
+        "backgroundColor": "#0F172A",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ],
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-secure-store",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "O aplicativo precisa de acesso à câmera para escanear códigos de barras e registrar avarias do veículo."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "O aplicativo precisa de acesso às fotos para anexar imagens de avarias do checklist."
+        }
+      ],
+      "expo-font"
+    ]
+  }
+}
