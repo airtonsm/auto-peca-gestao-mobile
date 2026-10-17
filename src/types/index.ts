@@ -189,3 +189,33 @@ export interface UrlDeUpload {
   urlDeLeitura: string;
   expiraEmSegundos: number;
 }
+
+export interface RespostaItemPecaOS {
+  id: string;
+  osId: string;
+  pecaId: string;
+  codigoInterno: string;
+  descricao: string;
+  quantidade: number;
+  custoUnitario?: number;
+  precoUnitario: number;
+  desconto: number;
+  total: number;
+  status: 'reservado' | 'aguardando' | 'aplicado' | 'cancelado' | string;
+  garantiaAte?: string;
+  ordem: number;
+  sugerirAguardandoPeca: boolean;
+  localizacao?: string; // Prateleira/corredor
+  unidade?: string;     // un, l, kg, etc.
+}
+
+export interface PedidoItemPecaOS {
+  pecaId: string;
+  quantidade: number;
+  precoUnitario?: number | null;
+  desconto?: number | null;
+}
+
+export interface PedidoQuantidadeItemPecaOS {
+  quantidade: number;
+}

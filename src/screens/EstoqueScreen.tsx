@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -10,14 +10,19 @@ import {
   RefreshControl,
   Modal,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { estoqueApi } from '../api/estoqueApi';
-import { RespostaPeca } from '../types';
+import { osApi } from '../api/osApi';
+import { pecasOSApi } from '../api/pecasOSApi';
+import { RespostaPeca, RespostaOSResumo } from '../types';
 import { CORES } from '../constants';
 import { extrairMensagemErro } from '../api/clienteHttp';
 import { BarcodeScannerModal } from '../components/BarcodeScannerModal';
+import { PlacaVeiculo } from '../components/PlacaVeiculo';
+import { ModalConfirmarLancamentoPeca } from '../components/ModalConfirmarLancamentoPeca';
 
 export const EstoqueScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -28,6 +33,89 @@ export const EstoqueScreen: React.FC = () => {
   const [erro, setErro] = useState<string | null>(null);
   const [scannerVisivel, setScannerVisivel] = useState(false);
   const [pecaSelecionada, setPecaSelecionada] = useState<RespostaPeca | null>(null);
+
+  // Estados para lançamento da peça em uma OS aberta
+  const [modalSelecaoOSVisivel, setModalSelecaoOSVisivel] = useState(false);
+  const [ordensServico, setOrdensServico] = useState<RespostaOSResumo[]>([]);
+  const [carregandoOS, setCarregandoOS] = useState(false);
+  const [buscaOS, setBuscaOS] = useState('');
+  const [pecaParaLancar, setPecaParaLancar] = useState<RespostaPeca | null>(null);
+  const [osSelecionadaParaLancar, setOsSelecionadaParaLancar] = useState<RespostaOSResumo | null>(null);
+  const [modalConfirmarLancamentoVisivel, setModalConfirmarLancamentoVisivel] = useState(false);
+  const [salvandoLancamento, setSalvandoLancamento] = useState(false);
+
+  const abrirSelecaoOSParaPeca = async (peca: RespostaPeca) => {
+    setPecaParaLancar(peca);
+    setModalSelecaoOSVisivel(true);
+    setCarregandoOS(true);
+    try {
+      const lista = await osApi.listarOS(true);
+      setOrdensServico(lista || []);
+    } catch (e) {
+      Alert.alert('Erro ao carregar veículos', extrairMensagemErro(e));
+    } finally {
+      setCarregandoOS(false);
+    }
+  };
+
+  const handleSelecionarOS = (os: RespostaOSResumo) => {
+    setOsSelecionadaParaLancar(os);
+    setModalSelecaoOSVisivel(false);
+    setModalConfirmarLancamentoVisivel(true);
+  };
+
+  const handleConfirmarLancamentoPeca = async (peca: RespostaPeca, quantidade: number) => {
+    if (!osSelecionadaParaLancar) return;
+    setSalvandoLancamento(true);
+    try {
+      const resultado = await pecasOSApi.lancarPeca(osSelecionadaParaLancar.id, {
+        pecaId: peca.id,
+        quantidade,
+        precoUnitario: peca.preco || null,
+        desconto: null,
+      });
+
+      setModalConfirmarLancamentoVisivel(false);
+      setPecaParaLancar(null);
+      setOsSelecionadaParaLancar(null);
+
+      // Atualiza o estoque para refletir a nova reserva
+      carregarPecas(termoBusca);
+
+      if (resultado.sugerirAguardandoPeca || resultado.status === 'aguardando') {
+        Alert.alert(
+          'Peça Lançada com Aviso',
+          `"${peca.descricao}" lançada na OS #${osSelecionadaParaLancar.numero} com status "Aguardando Peça" (saldo insuficiente).`
+        );
+      } else {
+        Alert.alert(
+          'Sucesso!',
+          `"${peca.descricao}" (${quantidade} ${peca.unidade || 'UN'}) vinculada à OS #${osSelecionadaParaLancar.numero} (${osSelecionadaParaLancar.placa}) com sucesso!`
+        );
+      }
+    } catch (e) {
+      Alert.alert('Erro ao Lançar Peça', extrairMensagemErro(e));
+    } finally {
+      setSalvandoLancamento(false);
+    }
+  };
+
+  const ordensServicoFiltradas = useMemo(() => {
+    if (!buscaOS.trim()) return ordensServico;
+    const termo = buscaOS.toLowerCase().trim();
+    return ordensServico.filter((os) => {
+      const placa = (os.placa || '').toLowerCase();
+      const cliente = (os.clienteNome || '').toLowerCase();
+      const veiculo = (os.veiculoDescricao || '').toLowerCase();
+      const numero = String(os.numero);
+      return (
+        placa.includes(termo) ||
+        cliente.includes(termo) ||
+        veiculo.includes(termo) ||
+        numero.includes(termo)
+      );
+    });
+  }, [ordensServico, buscaOS]);
 
   const carregarPecas = useCallback(async (termo: string = '') => {
     setCarregando(true);
@@ -143,6 +231,17 @@ export const EstoqueScreen: React.FC = () => {
             )}
           </View>
         )}
+
+        {/* Ação rápida: Lançar na OS */}
+        <View style={styles.cardAcaoLinha}>
+          <TouchableOpacity
+            style={styles.botaoLancarOSCard}
+            onPress={() => abrirSelecaoOSParaPeca(item)}
+          >
+            <Ionicons name="clipboard" size={14} color="#38BDF8" />
+            <Text style={styles.botaoLancarOSCardTexto}>Lançar na OS</Text>
+          </TouchableOpacity>
+        </View>
       </TouchableOpacity>
     );
   };
@@ -320,15 +419,157 @@ export const EstoqueScreen: React.FC = () => {
               </ScrollView>
             )}
 
-            <TouchableOpacity
-              style={[styles.botaoFecharModalDetalhe, { marginBottom: Math.max(insets.bottom, 12) }]}
-              onPress={() => setPecaSelecionada(null)}
-            >
-              <Text style={styles.botaoFecharModalDetalheTexto}>Fechar</Text>
-            </TouchableOpacity>
+            {/* Ações da Ficha */}
+            <View style={[styles.acoesModalDetalhe, { marginBottom: Math.max(insets.bottom, 12) }]}>
+              <TouchableOpacity
+                style={styles.botaoLancarNaOSModal}
+                onPress={() => {
+                  const p = pecaSelecionada;
+                  setPecaSelecionada(null);
+                  if (p) abrirSelecaoOSParaPeca(p);
+                }}
+              >
+                <Ionicons name="clipboard" size={18} color="#FFFFFF" />
+                <Text style={styles.botaoLancarNaOSModalTexto}>Lançar nesta Peça na OS</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.botaoFecharModalDetalhe}
+                onPress={() => setPecaSelecionada(null)}
+              >
+                <Text style={styles.botaoFecharModalDetalheTexto}>Fechar</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
+
+      {/* Modal Selecionar Veículo / OS para lançamento */}
+      <Modal
+        visible={modalSelecaoOSVisivel}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setModalSelecaoOSVisivel(false)}
+      >
+        <View style={styles.fundoModalSelecaoOS}>
+          <View style={styles.cardModalSelecaoOS}>
+            {/* Header */}
+            <View style={styles.headerModalSelecaoOS}>
+              <View>
+                <Text style={styles.tituloModalSelecaoOS}>Lançar Peça em Veículo</Text>
+                <Text style={styles.subtituloModalSelecaoOS}>
+                  Selecione a Ordem de Serviço em atendimento
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setModalSelecaoOSVisivel(false)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="close" size={24} color={CORES.texto} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Banner da Peça Sendo Lançada */}
+            {pecaParaLancar && (
+              <View style={styles.bannerPecaSendoLancada}>
+                <Ionicons name="cube" size={18} color="#38BDF8" />
+                <View style={styles.bannerPecaTextos}>
+                  <Text style={styles.bannerPecaCodigo}>{pecaParaLancar.codigoInterno}</Text>
+                  <Text style={styles.bannerPecaDescricao} numberOfLines={1}>
+                    {pecaParaLancar.descricao}
+                  </Text>
+                </View>
+                <Text style={styles.bannerPecaSaldo}>
+                  Disp: {pecaParaLancar.disponivel} {pecaParaLancar.unidade || 'UN'}
+                </Text>
+              </View>
+            )}
+
+            {/* Campo de Busca de OS */}
+            <View style={styles.buscaOSContainer}>
+              <Ionicons name="search" size={18} color={CORES.textoMudo} style={{ marginRight: 8 }} />
+              <TextInput
+                style={styles.inputBuscaOS}
+                placeholder="Buscar por placa, cliente ou veículo..."
+                placeholderTextColor={CORES.textoMudo}
+                value={buscaOS}
+                onChangeText={setBuscaOS}
+              />
+              {buscaOS.length > 0 && (
+                <TouchableOpacity onPress={() => setBuscaOS('')}>
+                  <Ionicons name="close-circle" size={18} color={CORES.textoMudo} />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Lista de Ordens de Serviço */}
+            {carregandoOS ? (
+              <View style={styles.loadingOSContainer}>
+                <ActivityIndicator size="small" color={CORES.primaria} />
+                <Text style={styles.loadingOSTexto}>Carregando veículos no pátio...</Text>
+              </View>
+            ) : (
+              <FlatList
+                data={ordensServicoFiltradas}
+                keyExtractor={(item) => item.id}
+                contentContainerStyle={{ paddingVertical: 8, gap: 10 }}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={styles.cardOSSelecao}
+                    activeOpacity={0.7}
+                    onPress={() => handleSelecionarOS(item)}
+                  >
+                    <View style={styles.cardOSSelecaoTopo}>
+                      <PlacaVeiculo placa={item.placa} tamanho="pequeno" />
+                      <View style={styles.cardOSSelecaoNumeroBox}>
+                        <Text style={styles.cardOSSelecaoNumero}>OS #{item.numero}</Text>
+                        {item.boxNome && (
+                          <Text style={styles.cardOSSelecaoBox}>Box: {item.boxNome}</Text>
+                        )}
+                      </View>
+                      <View style={styles.cardOSSelecaoSeta}>
+                        <Ionicons name="chevron-forward" size={20} color={CORES.primariaClara} />
+                      </View>
+                    </View>
+
+                    <Text style={styles.cardOSSelecaoVeiculo} numberOfLines={1}>
+                      {item.veiculoDescricao}
+                    </Text>
+
+                    <Text style={styles.cardOSSelecaoCliente} numberOfLines={1}>
+                      Cliente: {item.clienteNome}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                ListEmptyComponent={
+                  <View style={styles.vazioOSContainer}>
+                    <Ionicons name="car-sport-outline" size={48} color={CORES.borda} />
+                    <Text style={styles.vazioOSTitulo}>Nenhum veículo encontrado</Text>
+                    <Text style={styles.vazioOSSubtitulo}>
+                      {buscaOS
+                        ? 'Não há OSs correspondentes à busca informada.'
+                        : 'Não há ordens de serviço abertas no momento.'}
+                    </Text>
+                  </View>
+                }
+              />
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal de Confirmação de Quantidade e Localização */}
+      <ModalConfirmarLancamentoPeca
+        visivel={modalConfirmarLancamentoVisivel}
+        peca={pecaParaLancar}
+        os={osSelecionadaParaLancar}
+        aoFechar={() => {
+          setModalConfirmarLancamentoVisivel(false);
+          setOsSelecionadaParaLancar(null);
+        }}
+        aoConfirmar={handleConfirmarLancamentoPeca}
+        carregando={salvandoLancamento}
+      />
     </View>
   );
 };
@@ -611,14 +852,196 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   botaoFecharModalDetalhe: {
+    flex: 1,
     backgroundColor: CORES.superficieClara,
     paddingVertical: 14,
     borderRadius: 10,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: CORES.borda,
   },
   botaoFecharModalDetalheTexto: {
     color: CORES.texto,
     fontSize: 15,
     fontWeight: '700',
+  },
+  cardAcaoLinha: {
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: CORES.bordaSuave,
+    alignItems: 'flex-end',
+  },
+  botaoLancarOSCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(56, 189, 248, 0.12)',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.35)',
+    gap: 6,
+  },
+  botaoLancarOSCardTexto: {
+    color: '#38BDF8',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  acoesModalDetalhe: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  botaoLancarNaOSModal: {
+    flex: 2,
+    flexDirection: 'row',
+    backgroundColor: CORES.primaria,
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  botaoLancarNaOSModalTexto: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  fundoModalSelecaoOS: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    justifyContent: 'flex-end',
+  },
+  cardModalSelecaoOS: {
+    backgroundColor: CORES.superficie,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 20,
+    maxHeight: '85%',
+  },
+  headerModalSelecaoOS: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 14,
+  },
+  tituloModalSelecaoOS: {
+    color: CORES.texto,
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  subtituloModalSelecaoOS: {
+    color: CORES.textoSecundario,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  bannerPecaSendoLancada: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0C4A6E',
+    padding: 10,
+    borderRadius: 8,
+    gap: 10,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#0284C7',
+  },
+  bannerPecaTextos: {
+    flex: 1,
+  },
+  bannerPecaCodigo: {
+    color: '#38BDF8',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  bannerPecaDescricao: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  bannerPecaSaldo: {
+    color: '#86EFAC',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  buscaOSContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: CORES.fundo,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: CORES.borda,
+    paddingHorizontal: 12,
+    height: 44,
+    marginBottom: 10,
+  },
+  inputBuscaOS: {
+    flex: 1,
+    color: CORES.texto,
+    fontSize: 14,
+  },
+  loadingOSContainer: {
+    padding: 30,
+    alignItems: 'center',
+    gap: 8,
+  },
+  loadingOSTexto: {
+    color: CORES.textoSecundario,
+    fontSize: 13,
+  },
+  cardOSSelecao: {
+    backgroundColor: CORES.fundo,
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: CORES.bordaSuave,
+    gap: 6,
+  },
+  cardOSSelecaoTopo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  cardOSSelecaoNumeroBox: {
+    flex: 1,
+    marginLeft: 10,
+  },
+  cardOSSelecaoNumero: {
+    color: CORES.primariaClara,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  cardOSSelecaoBox: {
+    color: '#38BDF8',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  cardOSSelecaoSeta: {
+    padding: 4,
+  },
+  cardOSSelecaoVeiculo: {
+    color: CORES.texto,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  cardOSSelecaoCliente: {
+    color: CORES.textoSecundario,
+    fontSize: 12,
+  },
+  vazioOSContainer: {
+    padding: 30,
+    alignItems: 'center',
+    gap: 6,
+  },
+  vazioOSTitulo: {
+    color: CORES.texto,
+    fontSize: 16,
+    fontWeight: '700',
+    marginTop: 8,
+  },
+  vazioOSSubtitulo: {
+    color: CORES.textoSecundario,
+    fontSize: 12,
+    textAlign: 'center',
   },
 });

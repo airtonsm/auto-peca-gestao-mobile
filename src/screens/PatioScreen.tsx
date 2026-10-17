@@ -23,6 +23,7 @@ import { extrairMensagemErro } from '../api/clienteHttp';
 import { PlacaVeiculo } from '../components/PlacaVeiculo';
 import { StatusBadge } from '../components/StatusBadge';
 import { ChecklistDetalhesModal } from '../components/ChecklistDetalhesModal';
+import { ModalPecasOS } from '../components/ModalPecasOS';
 
 const FILTROS_STATUS = [
   { chave: 'todos', rotulo: 'Todas' },
@@ -49,6 +50,15 @@ export const PatioScreen: React.FC = () => {
   const [modalChecklistsVisivel, setModalChecklistsVisivel] = useState(false);
   const [osHistoricoSelecionada, setOsHistoricoSelecionada] = useState<RespostaOSResumo | null>(null);
   const [historicoChecklists, setHistoricoChecklists] = useState<RespostaChecklist[]>([]);
+
+  // Modal para gerenciamento e lançamento de peças na OS
+  const [modalPecasVisivel, setModalPecasVisivel] = useState(false);
+  const [osPecasSelecionada, setOsPecasSelecionada] = useState<RespostaOSResumo | null>(null);
+
+  const abrirModalPecas = (os: RespostaOSResumo) => {
+    setOsPecasSelecionada(os);
+    setModalPecasVisivel(true);
+  };
 
   const carregarOS = useCallback(async () => {
     setCarregando(true);
@@ -237,8 +247,20 @@ export const PatioScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* Barra de Ações: Mostrar Checklist ou Fazer Checklist */}
+        {/* Barra de Ações: Peças e Checklists */}
         <View style={styles.cardAcoes}>
+          {/* Botão de Peças da OS */}
+          <TouchableOpacity
+            style={styles.botaoPecasOS}
+            onPress={() => abrirModalPecas(item)}
+          >
+            <Ionicons name="cube" size={16} color="#38BDF8" />
+            <Text style={styles.botaoPecasOSTexto}>Peças</Text>
+            {item.aguardandoPeca && (
+              <View style={styles.pontoAguardandoPeca} />
+            )}
+          </TouchableOpacity>
+
           {temChecklist ? (
             <>
               {/* Botão Principal: Mostrar Checklist */}
@@ -371,6 +393,17 @@ export const PatioScreen: React.FC = () => {
         os={osHistoricoSelecionada}
         checklists={historicoChecklists}
         onIniciarSaida={(os) => iniciarChecklist(os, 'saida')}
+      />
+
+      {/* Modal de Gestão e Lançamento de Peças na OS */}
+      <ModalPecasOS
+        visivel={modalPecasVisivel}
+        os={osPecasSelecionada}
+        aoFechar={() => {
+          setModalPecasVisivel(false);
+          setOsPecasSelecionada(null);
+        }}
+        aoAtualizarOS={carregarOS}
       />
     </View>
   );
@@ -531,6 +564,29 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: CORES.bordaSuave,
+  },
+  botaoPecasOS: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    backgroundColor: 'rgba(56, 189, 248, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.35)',
+    gap: 6,
+  },
+  botaoPecasOSTexto: {
+    color: '#38BDF8',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  pontoAguardandoPeca: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: '#F59E0B',
   },
   botaoVerChecklists: {
     flexDirection: 'row',
