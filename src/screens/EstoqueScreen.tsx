@@ -8,10 +8,10 @@ import {
   FlatList,
   ActivityIndicator,
   RefreshControl,
-  SafeAreaView,
   Modal,
   ScrollView,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { estoqueApi } from '../api/estoqueApi';
 import { RespostaPeca } from '../types';
@@ -20,6 +20,7 @@ import { extrairMensagemErro } from '../api/clienteHttp';
 import { BarcodeScannerModal } from '../components/BarcodeScannerModal';
 
 export const EstoqueScreen: React.FC = () => {
+  const insets = useSafeAreaInsets();
   const [termoBusca, setTermoBusca] = useState('');
   const [pecas, setPecas] = useState<RespostaPeca[]>([]);
   const [carregando, setCarregando] = useState(false);
@@ -147,7 +148,7 @@ export const EstoqueScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       {/* Barra de Pesquisa com Atalho para Scanner de Câmera */}
       <View style={styles.buscaSecao}>
         <View style={styles.inputBuscaContainer}>
@@ -198,7 +199,7 @@ export const EstoqueScreen: React.FC = () => {
           data={pecas}
           keyExtractor={(item) => item.id}
           renderItem={renderItemPeca}
-          contentContainerStyle={styles.listaConteudo}
+          contentContainerStyle={[styles.listaConteudo, { paddingBottom: insets.bottom + 80 }]}
           refreshControl={
             <RefreshControl
               refreshing={recarregando}
@@ -320,7 +321,7 @@ export const EstoqueScreen: React.FC = () => {
             )}
 
             <TouchableOpacity
-              style={styles.botaoFecharModalDetalhe}
+              style={[styles.botaoFecharModalDetalhe, { marginBottom: Math.max(insets.bottom, 12) }]}
               onPress={() => setPecaSelecionada(null)}
             >
               <Text style={styles.botaoFecharModalDetalheTexto}>Fechar</Text>
@@ -328,7 +329,7 @@ export const EstoqueScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 };
 

@@ -5,9 +5,9 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   StatusBar,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
 import { CORES } from '../constants';
@@ -23,6 +23,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
   aoFechar,
   aoEscanear,
 }) => {
+  const insets = useSafeAreaInsets();
   const [permission, requestPermission] = useCameraPermissions();
   const [flashAtivo, setFlashAtivo] = useState(false);
   const [escaneado, setEscaneado] = useState(false);
@@ -46,11 +47,11 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
       transparent={false}
       onRequestClose={aoFechar}
     >
-      <SafeAreaView style={styles.container}>
+      <View style={styles.container}>
         <StatusBar barStyle="light-content" />
 
         {/* Cabeçalho */}
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
           <TouchableOpacity
             style={styles.botaoFechar}
             onPress={aoFechar}
@@ -128,7 +129,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
                 <View style={styles.mascaraLateral} />
               </View>
 
-              <View style={styles.mascaraInferior}>
+              <View style={[styles.mascaraInferior, { paddingBottom: Math.max(insets.bottom, 16) }]}>
                 <Text style={styles.instrucaoTexto}>
                   Aponte para o código de barras ou EAN/GTIN da etiqueta da peça
                 </Text>
@@ -136,7 +137,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
             </View>
           </View>
         )}
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 };

@@ -8,15 +8,17 @@ import {
   TextInput,
   Image,
   ScrollView,
-  SafeAreaView,
   Alert,
   ActivityIndicator,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system/legacy';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { Ionicons } from '@expo/vector-icons';
 import { CORES, REGIOES_AVARIA, TIPOS_AVARIA } from '../constants';
 import { AvariaLocal, RegiaoAvaria, TipoAvaria } from '../types';
+import { CameraCaptureModal } from './CameraCaptureModal';
 
 interface AvariaPhotoCaptureModalProps {
   visivel: boolean;
@@ -29,17 +31,20 @@ export const AvariaPhotoCaptureModal: React.FC<AvariaPhotoCaptureModalProps> = (
   aoFechar,
   aoSalvar,
 }) => {
+  const insets = useSafeAreaInsets();
   const [regiao, setRegiao] = useState<RegiaoAvaria>('para-choque-dianteiro');
   const [tipo, setTipo] = useState<TipoAvaria>('risco');
   const [descricao, setDescricao] = useState('');
   const [fotoUri, setFotoUri] = useState<string | null>(null);
   const [processandoFoto, setProcessandoFoto] = useState(false);
+  const [cameraInternaVisivel, setCameraInternaVisivel] = useState(false);
 
   const resetarFormulario = () => {
     setRegiao('para-choque-dianteiro');
     setTipo('risco');
     setDescricao('');
     setFotoUri(null);
+    setCameraInternaVisivel(false);
   };
 
   const fecharEResetar = () => {
@@ -48,44 +53,28 @@ export const AvariaPhotoCaptureModal: React.FC<AvariaPhotoCaptureModalProps> = (
   };
 
   const otimizarFoto = async (uri: string): Promise<string> => {
-    // Redimensiona para no máximo 1600px de largura mantendo a proporção,
-    // com compressão JPEG a 80% de qualidade para economizar banda no pátio.
-    const resultado = await manipulateAsync(
-      uri,
-      [{ resize: { width: 1600 } }],
-      { compress: 0.8, format: SaveFormat.JPEG }
-    );
-    return resultado.uri;
+    try {
+      // Redimensiona para no máximo 1024px de largura com compressão 0.7
+      // para economizar RAM substancialmente no Android e evitar OOM/reinício
+      const resultado = await manipulateAsync(
+        uri,
+        [{ resize: { width: 1024 } }],
+        { compress: 0.7, format: SaveFormat.JPEG }
+      );
+      if (uri !== resultado.uri) {
+        await FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
+      }
+      return resultado.uri;
+    } catch (e) {
+      console.warn('Erro ao otimizar foto, mantendo URI original:', e);
+      return uri;
+    }
   };
 
-  const tirarFotoCamera = async () => {
-    try {
-      const permissao = await ImagePicker.requestCameraPermissionsAsync();
-      if (!permissao.granted) {
-        Alert.alert(
-          'Permissão necessária',
-          'Autorize o acesso à câmera para fotografar a avaria do veículo.'
-        );
-        return;
-      }
-
-      setProcessandoFoto(true);
-      const resultado = await ImagePicker.launchCameraAsync({
-        mediaTypes: ['images'],
-        allowsEditing: false,
-        quality: 0.8,
-      });
-
-      if (!resultado.canceled && resultado.assets[0]?.uri) {
-        const fotoOtimizada = await otimizarFoto(resultado.assets[0].uri);
-        setFotoUri(fotoOtimizada);
-      }
-    } catch (e) {
-      console.error('Erro ao capturar foto da câmera:', e);
-      Alert.alert('Erro', 'Não foi possível capturar a foto da câmera.');
-    } finally {
-      setProcessandoFoto(false);
-    }
+  const tirarFotoCamera = () => {
+    // Abre a câmera embutida diretamente dentro do app sem chamar o app de câmera externo
+    // Isso impede completamente que o Android destrua a Activity por falta de memória
+    setCameraInternaVisivel(true);
   };
 
   const escolherFotoGaleria = async () => {
@@ -103,7 +92,7 @@ export const AvariaPhotoCaptureModal: React.FC<AvariaPhotoCaptureModalProps> = (
       const resultado = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         allowsEditing: false,
-        quality: 0.8,
+        quality: 0.6,
       });
 
       if (!resultado.canceled && resultado.assets[0]?.uri) {
@@ -143,8 +132,8 @@ export const AvariaPhotoCaptureModal: React.FC<AvariaPhotoCaptureModalProps> = (
       transparent={false}
       onRequestClose={fecharEResetar}
     >
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
+      <View style={styles.container}>
+        <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
           <TouchableOpacity onPress={fecharEResetar} style={styles.botaoVoltar}>
             <Ionicons name="arrow-back" size={24} color={CORES.texto} />
           </TouchableOpacity>
@@ -152,7 +141,7 @@ export const AvariaPhotoCaptureModal: React.FC<AvariaPhotoCaptureModalProps> = (
           <View style={{ width: 40 }} />
         </View>
 
-        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]} keyboardShouldPersistTaps="handled">
           {/* Seletor de Região */}
           <View style={styles.bloco}>
             <Text style={styles.labelBloco}>1. Região do Veículo</Text>
@@ -269,12 +258,24 @@ export const AvariaPhotoCaptureModal: React.FC<AvariaPhotoCaptureModalProps> = (
           </View>
 
           {/* Botão Salvar Avaria */}
-          <TouchableOpacity style={styles.botaoSalvar} onPress={handleSalvar}>
+          <TouchableOpacity
+            style={[styles.botaoSalvar, { marginBottom: Math.max(insets.bottom, 16) }]}
+            onPress={handleSalvar}
+          >
             <Ionicons name="checkmark-circle-outline" size={22} color="#FFFFFF" />
             <Text style={styles.botaoSalvarTexto}>Adicionar à Vistoria</Text>
           </TouchableOpacity>
         </ScrollView>
-      </SafeAreaView>
+      </View>
+
+      {/* Câmera Interna sem fechar o app */}
+      <CameraCaptureModal
+        visivel={cameraInternaVisivel}
+        titulo="Fotografar Avaria"
+        subtitulo="Aponte para o detalhe da avaria no veículo"
+        aoFechar={() => setCameraInternaVisivel(false)}
+        aoCapturarFoto={(uri) => setFotoUri(uri)}
+      />
     </Modal>
   );
 };

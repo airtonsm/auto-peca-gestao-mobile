@@ -10,15 +10,17 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  SafeAreaView,
   Alert,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { CORES } from '../constants';
 import { ConfiguradorServidorModal } from '../components/ConfiguradorServidorModal';
+import { AutoFLogo } from '../components/AutoFLogo';
 
 export const LoginScreen: React.FC = () => {
+  const insets = useSafeAreaInsets();
   const {
     login,
     oficinasDisponiveis,
@@ -66,22 +68,18 @@ export const LoginScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top, paddingBottom: Math.max(insets.bottom, 16) }]}>
       <KeyboardAvoidingView
         style={styles.keyboardContainer}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 80 }]}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Topo / Logo */}
+          {/* Topo / Logo Oficial AutoF */}
           <View style={styles.logoSecao}>
-            <View style={styles.iconeLogoBox}>
-              <Ionicons name="construct" size={42} color="#FFFFFF" />
-            </View>
-            <Text style={styles.appTitulo}>Auto-Peça & Gestão</Text>
-            <Text style={styles.appSubtitulo}>Operação Mobile de Pátio & Oficina</Text>
+            <AutoFLogo tamanho="grande" mostrarSubtitulo orientacao="vertical" />
           </View>
 
           {/* Card do Formulário */}
@@ -226,7 +224,7 @@ export const LoginScreen: React.FC = () => {
         visivel={modalServidorVisivel}
         aoFechar={() => setModalServidorVisivel(false)}
       />
-    </SafeAreaView>
+    </View>
   );
 };
 

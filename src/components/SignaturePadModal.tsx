@@ -5,9 +5,9 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   Alert,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import SignatureScreen, { SignatureViewRef } from 'react-native-signature-canvas';
 import { Ionicons } from '@expo/vector-icons';
 import { CORES } from '../constants';
@@ -23,6 +23,7 @@ export const SignaturePadModal: React.FC<SignaturePadModalProps> = ({
   aoFechar,
   aoConfirmar,
 }) => {
+  const insets = useSafeAreaInsets();
   const ref = useRef<SignatureViewRef>(null);
 
   const handleOK = (signature: string) => {
@@ -83,9 +84,9 @@ export const SignaturePadModal: React.FC<SignaturePadModalProps> = ({
       transparent={false}
       onRequestClose={aoFechar}
     >
-      <SafeAreaView style={styles.container}>
+      <View style={styles.container}>
         {/* Cabeçalho */}
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: insets.top + 8, height: 64 + insets.top }]}>
           <TouchableOpacity onPress={aoFechar} style={styles.botaoFechar}>
             <Ionicons name="close" size={26} color={CORES.texto} />
           </TouchableOpacity>
@@ -110,7 +111,7 @@ export const SignaturePadModal: React.FC<SignaturePadModalProps> = ({
         </View>
 
         {/* Barra de Ações Inferior */}
-        <View style={styles.footerAcoes}>
+        <View style={[styles.footerAcoes, { paddingBottom: Math.max(insets.bottom, 16) }]}>
           <TouchableOpacity style={styles.botaoLimpar} onPress={handleClear}>
             <Ionicons name="trash-outline" size={20} color={CORES.perigoTexto} />
             <Text style={styles.botaoLimparTexto}>Limpar</Text>
@@ -121,7 +122,7 @@ export const SignaturePadModal: React.FC<SignaturePadModalProps> = ({
             <Text style={styles.botaoConfirmarTexto}>Confirmar Assinatura</Text>
           </TouchableOpacity>
         </View>
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 };

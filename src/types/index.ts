@@ -1,4 +1,4 @@
-// Contratos e tipos do aplicativo mobile Auto-Peça & Gestão
+// Contratos e tipos do aplicativo mobile AutoF Sistema de Gestão
 
 export interface UsuarioMe {
   id: string;
@@ -137,6 +137,7 @@ export interface PedidoChecklist {
     perguntaId: string;
     resposta: RespostaChecklistItem;
     observacao?: string;
+    fotoUrl?: string;
   }>;
   avarias: Array<{
     regiao: string;
@@ -154,6 +155,7 @@ export interface RespostaItemChecklist {
   pergunta: string;
   resposta: string;
   observacao?: string;
+  fotoUrl?: string;
   critico: boolean;
 }
 

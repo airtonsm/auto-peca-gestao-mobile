@@ -8,10 +8,10 @@ import {
   FlatList,
   ActivityIndicator,
   RefreshControl,
-  SafeAreaView,
   Modal,
   ScrollView,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,6 +22,7 @@ import { CORES } from '../constants';
 import { extrairMensagemErro } from '../api/clienteHttp';
 import { PlacaVeiculo } from '../components/PlacaVeiculo';
 import { StatusBadge } from '../components/StatusBadge';
+import { ChecklistDetalhesModal } from '../components/ChecklistDetalhesModal';
 
 const FILTROS_STATUS = [
   { chave: 'todos', rotulo: 'Todas' },
@@ -32,6 +33,7 @@ const FILTROS_STATUS = [
 ];
 
 export const PatioScreen: React.FC = () => {
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const [ordens, setOrdens] = useState<RespostaOSResumo[]>([]);
   const [carregando, setCarregando] = useState(false);
@@ -40,18 +42,39 @@ export const PatioScreen: React.FC = () => {
   const [termoBusca, setTermoBusca] = useState('');
   const [filtroStatus, setFiltroStatus] = useState('todos');
 
-  // Modal para ver histórico de checklists de uma OS
+  // Mapeamento dos checklists de cada OS ({ [osId]: RespostaChecklist[] })
+  const [checklistsPorOS, setChecklistsPorOS] = useState<Record<string, RespostaChecklist[]>>({});
+
+  // Modal para ver detalhes completos do checklist de uma OS
   const [modalChecklistsVisivel, setModalChecklistsVisivel] = useState(false);
   const [osHistoricoSelecionada, setOsHistoricoSelecionada] = useState<RespostaOSResumo | null>(null);
   const [historicoChecklists, setHistoricoChecklists] = useState<RespostaChecklist[]>([]);
-  const [carregandoHistorico, setCarregandoHistorico] = useState(false);
 
   const carregarOS = useCallback(async () => {
     setCarregando(true);
     setErro(null);
     try {
       const dados = await osApi.listarOS(true);
-      setOrdens(dados || []);
+      const lista = dados || [];
+      setOrdens(lista);
+
+      // Busca os checklists de todas as OSs em paralelo para exibir botões e status corretos
+      if (lista.length > 0) {
+        const mapa: Record<string, RespostaChecklist[]> = {};
+        await Promise.all(
+          lista.map(async (os) => {
+            try {
+              const chks = await checklistApi.obterChecklistsDaOS(os.id);
+              mapa[os.id] = chks || [];
+            } catch {
+              mapa[os.id] = [];
+            }
+          })
+        );
+        setChecklistsPorOS(mapa);
+      } else {
+        setChecklistsPorOS({});
+      }
     } catch (e) {
       setErro(extrairMensagemErro(e));
     } finally {
@@ -98,32 +121,42 @@ export const PatioScreen: React.FC = () => {
     });
   }, [ordens, filtroStatus, termoBusca]);
 
-  const abrirHistoricoChecklists = async (os: RespostaOSResumo) => {
+  const abrirDetalhesChecklist = async (os: RespostaOSResumo) => {
     setOsHistoricoSelecionada(os);
-    setModalChecklistsVisivel(true);
-    setCarregandoHistorico(true);
-    try {
-      const listas = await checklistApi.obterChecklistsDaOS(os.id);
-      setHistoricoChecklists(listas || []);
-    } catch (e) {
-      console.warn('Erro ao carregar checklists da OS:', e);
-      setHistoricoChecklists([]);
-    } finally {
-      setCarregandoHistorico(false);
+    const chksSalvos = checklistsPorOS[os.id];
+    if (chksSalvos && chksSalvos.length > 0) {
+      setHistoricoChecklists(chksSalvos);
+      setModalChecklistsVisivel(true);
+    } else {
+      setModalChecklistsVisivel(true);
+      try {
+        const listas = await checklistApi.obterChecklistsDaOS(os.id);
+        setHistoricoChecklists(listas || []);
+        setChecklistsPorOS((prev) => ({ ...prev, [os.id]: listas || [] }));
+      } catch (e) {
+        console.warn('Erro ao carregar checklists da OS:', e);
+        setHistoricoChecklists([]);
+      }
     }
   };
 
-  const iniciarChecklist = (os: RespostaOSResumo) => {
+  const iniciarChecklist = (os: RespostaOSResumo, tipoPreferencia?: 'entrada' | 'saida') => {
     navigation.navigate('Checklist', {
       osId: os.id,
       numero: os.numero,
       placa: os.placa,
       veiculoDescricao: os.veiculoDescricao,
       clienteNome: os.clienteNome,
+      tipoInicial: tipoPreferencia,
     });
   };
 
   const renderCardOS = ({ item }: { item: RespostaOSResumo }) => {
+    const checklistsDaOS = checklistsPorOS[item.id] || [];
+    const temChecklist = checklistsDaOS.length > 0;
+    const temEntrada = checklistsDaOS.some((c) => c.tipo === 'entrada');
+    const temSaida = checklistsDaOS.some((c) => c.tipo === 'saida');
+
     return (
       <View style={styles.cardOS}>
         {/* Cabeçalho do Card: Placa, Número da OS e Status */}
@@ -165,32 +198,86 @@ export const PatioScreen: React.FC = () => {
               </Text>
             </View>
           )}
+
+          {/* Badge Indicador de Checklist */}
+          <View style={styles.linhaChecklistStatus}>
+            {temChecklist ? (
+              <View
+                style={[
+                  styles.tagChecklist,
+                  temEntrada && temSaida
+                    ? styles.tagChecklistCompleto
+                    : styles.tagChecklistParcial,
+                ]}
+              >
+                <Ionicons
+                  name={temEntrada && temSaida ? 'checkmark-done-circle' : 'checkmark-circle'}
+                  size={14}
+                  color={temEntrada && temSaida ? '#22C55E' : '#38BDF8'}
+                />
+                <Text
+                  style={[
+                    styles.tagChecklistTexto,
+                    { color: temEntrada && temSaida ? '#22C55E' : '#38BDF8' },
+                  ]}
+                >
+                  {temEntrada && temSaida
+                    ? 'Checklists Entrada e Saída Concluídos'
+                    : 'Checklist de Entrada Preenchido'}
+                </Text>
+              </View>
+            ) : (
+              <View style={[styles.tagChecklist, styles.tagChecklistPendente]}>
+                <Ionicons name="time-outline" size={14} color={CORES.alertaTexto} />
+                <Text style={[styles.tagChecklistTexto, { color: CORES.alertaTexto }]}>
+                  Checklist Pendente
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
 
-        {/* Barra de Ações: Fazer Checklist / Ver Checklists */}
+        {/* Barra de Ações: Mostrar Checklist ou Fazer Checklist */}
         <View style={styles.cardAcoes}>
-          <TouchableOpacity
-            style={styles.botaoVerChecklists}
-            onPress={() => abrirHistoricoChecklists(item)}
-          >
-            <Ionicons name="document-text-outline" size={16} color={CORES.textoSecundario} />
-            <Text style={styles.botaoVerChecklistsTexto}>Vistorias</Text>
-          </TouchableOpacity>
+          {temChecklist ? (
+            <>
+              {/* Botão Principal: Mostrar Checklist */}
+              <TouchableOpacity
+                style={styles.botaoMostrarChecklist}
+                onPress={() => abrirDetalhesChecklist(item)}
+              >
+                <Ionicons name="eye-outline" size={18} color="#FFFFFF" />
+                <Text style={styles.botaoMostrarChecklistTexto}>Mostrar Checklist</Text>
+              </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.botaoFazerChecklist}
-            onPress={() => iniciarChecklist(item)}
-          >
-            <Ionicons name="clipboard-outline" size={18} color="#FFFFFF" />
-            <Text style={styles.botaoFazerChecklistTexto}>Fazer Checklist</Text>
-          </TouchableOpacity>
+              {/* Botão Secundário: Preencher Saída se apenas Entrada foi feita */}
+              {temEntrada && !temSaida && (
+                <TouchableOpacity
+                  style={styles.botaoFazerSaida}
+                  onPress={() => iniciarChecklist(item, 'saida')}
+                >
+                  <Ionicons name="exit-outline" size={16} color="#10B981" />
+                  <Text style={styles.botaoFazerSaidaTexto}>+ Saída</Text>
+                </TouchableOpacity>
+              )}
+            </>
+          ) : (
+            /* Botão Principal quando NÃO tem checklist preenchido: Fazer Checklist */
+            <TouchableOpacity
+              style={styles.botaoFazerChecklist}
+              onPress={() => iniciarChecklist(item, 'entrada')}
+            >
+              <Ionicons name="clipboard-outline" size={18} color="#FFFFFF" />
+              <Text style={styles.botaoFazerChecklistTexto}>Fazer Checklist</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     );
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       {/* Barra de Busca de OS */}
       <View style={styles.topoSecao}>
         <View style={styles.inputBuscaContainer}>
@@ -254,7 +341,7 @@ export const PatioScreen: React.FC = () => {
           data={ordensFiltradas}
           keyExtractor={(item) => item.id}
           renderItem={renderCardOS}
-          contentContainerStyle={styles.listaConteudo}
+          contentContainerStyle={[styles.listaConteudo, { paddingBottom: insets.bottom + 80 }]}
           refreshControl={
             <RefreshControl
               refreshing={recarregando}
@@ -277,125 +364,15 @@ export const PatioScreen: React.FC = () => {
         />
       )}
 
-      {/* Modal Histórico de Checklists da OS */}
-      <Modal
-        visible={modalChecklistsVisivel}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setModalChecklistsVisivel(false)}
-      >
-        <View style={styles.fundoModal}>
-          <View style={styles.cardModalHistorico}>
-            <View style={styles.headerModalHistorico}>
-              <View>
-                <Text style={styles.tituloModalHistorico}>
-                  Vistorias da OS #{osHistoricoSelecionada?.numero}
-                </Text>
-                <Text style={styles.subtituloModalHistorico}>
-                  Placa: {osHistoricoSelecionada?.placa} • {osHistoricoSelecionada?.veiculoDescricao}
-                </Text>
-              </View>
-              <TouchableOpacity onPress={() => setModalChecklistsVisivel(false)}>
-                <Ionicons name="close" size={24} color={CORES.texto} />
-              </TouchableOpacity>
-            </View>
-
-            {carregandoHistorico ? (
-              <View style={styles.loadingModal}>
-                <ActivityIndicator size="large" color={CORES.primaria} />
-                <Text style={styles.loadingTexto}>Buscando checklists gravados...</Text>
-              </View>
-            ) : historicoChecklists.length === 0 ? (
-              <View style={styles.vazioHistorico}>
-                <Ionicons name="clipboard-outline" size={48} color={CORES.borda} />
-                <Text style={styles.vazioHistoricoTitulo}>Nenhum checklist registrado ainda</Text>
-                <Text style={styles.vazioHistoricoSubtitulo}>
-                  Esta ordem de serviço ainda não possui vistorias de entrada ou saída.
-                </Text>
-                {osHistoricoSelecionada && (
-                  <TouchableOpacity
-                    style={styles.botaoIniciarDoModal}
-                    onPress={() => {
-                      setModalChecklistsVisivel(false);
-                      iniciarChecklist(osHistoricoSelecionada);
-                    }}
-                  >
-                    <Ionicons name="add-circle-outline" size={20} color="#FFFFFF" />
-                    <Text style={styles.botaoIniciarDoModalTexto}>Realizar Checklist Agora</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            ) : (
-              <ScrollView style={styles.corpoModalHistorico}>
-                {historicoChecklists.map((chk) => (
-                  <View key={chk.id} style={styles.itemChecklistHistorico}>
-                    <View style={styles.topoChecklistLinha}>
-                      <View
-                        style={[
-                          styles.badgeTipoChecklist,
-                          chk.tipo === 'entrada'
-                            ? styles.badgeTipoEntrada
-                            : styles.badgeTipoSaida,
-                        ]}
-                      >
-                        <Text style={styles.badgeTipoTexto}>
-                          {chk.tipo === 'entrada' ? 'ENTRADA' : 'SAÍDA'}
-                        </Text>
-                      </View>
-                      <Text style={styles.dataChecklistText}>
-                        {new Date(chk.preenchidoEm).toLocaleDateString('pt-BR', {
-                          day: '2-digit',
-                          month: '2-digit',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </Text>
-                    </View>
-
-                    <View style={styles.metricasChecklist}>
-                      <Text style={styles.metricaText}>
-                        Odômetro: <Text style={{ fontWeight: '700', color: CORES.texto }}>{chk.km} KM</Text>
-                      </Text>
-                      <Text style={styles.metricaText}>
-                        Combustível: <Text style={{ fontWeight: '700', color: CORES.texto }}>{Math.round(chk.nivelCombustivel * 100)}%</Text>
-                      </Text>
-                      <Text style={styles.metricaText}>
-                        Avarias: <Text style={{ fontWeight: '700', color: chk.avarias.length > 0 ? CORES.alertaTexto : CORES.sucessoTexto }}>
-                          {chk.avarias.length}
-                        </Text>
-                      </Text>
-                    </View>
-
-                    {chk.observacoes ? (
-                      <Text style={styles.obsChecklistText}>
-                        Obs: {chk.observacoes}
-                      </Text>
-                    ) : null}
-
-                    {chk.pertences && chk.pertences.length > 0 && (
-                      <View style={styles.pertencesLinha}>
-                        <Text style={styles.pertencesLabel}>Pertences:</Text>
-                        <Text style={styles.pertencesValores}>
-                          {chk.pertences.join(', ')}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                ))}
-              </ScrollView>
-            )}
-
-            <TouchableOpacity
-              style={styles.botaoFecharModal}
-              onPress={() => setModalChecklistsVisivel(false)}
-            >
-              <Text style={styles.botaoFecharModalTexto}>Fechar</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-    </SafeAreaView>
+      {/* Modal Detalhado de Checklist */}
+      <ChecklistDetalhesModal
+        visivel={modalChecklistsVisivel}
+        onFechar={() => setModalChecklistsVisivel(false)}
+        os={osHistoricoSelecionada}
+        checklists={historicoChecklists}
+        onIniciarSaida={(os) => iniciarChecklist(os, 'saida')}
+      />
+    </View>
   );
 };
 
@@ -572,6 +549,70 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
+  linhaChecklistStatus: {
+    marginTop: 4,
+  },
+  tagChecklist: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  tagChecklistCompleto: {
+    backgroundColor: 'rgba(34, 197, 94, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(34, 197, 94, 0.25)',
+  },
+  tagChecklistParcial: {
+    backgroundColor: 'rgba(56, 189, 248, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.25)',
+  },
+  tagChecklistPendente: {
+    backgroundColor: 'rgba(234, 179, 8, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(234, 179, 8, 0.25)',
+  },
+  tagChecklistTexto: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  botaoMostrarChecklist: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: '#2563EB',
+    gap: 6,
+  },
+  botaoMostrarChecklistTexto: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  botaoFazerSaida: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    borderWidth: 1,
+    borderColor: '#10B981',
+    gap: 4,
+  },
+  botaoFazerSaidaTexto: {
+    color: '#10B981',
+    fontSize: 13,
+    fontWeight: '800',
+  },
   botaoFazerChecklist: {
     flex: 1,
     flexDirection: 'row',
@@ -606,150 +647,5 @@ const styles = StyleSheet.create({
     fontSize: 13,
     textAlign: 'center',
     lineHeight: 18,
-  },
-  fundoModal: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    justifyContent: 'flex-end',
-  },
-  cardModalHistorico: {
-    backgroundColor: CORES.superficie,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    maxHeight: '85%',
-  },
-  headerModalHistorico: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: CORES.bordaSuave,
-    paddingBottom: 12,
-  },
-  tituloModalHistorico: {
-    color: CORES.texto,
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  subtituloModalHistorico: {
-    color: CORES.textoSecundario,
-    fontSize: 13,
-    marginTop: 2,
-  },
-  corpoModalHistorico: {
-    marginBottom: 16,
-  },
-  loadingModal: {
-    padding: 40,
-    alignItems: 'center',
-  },
-  vazioHistorico: {
-    padding: 30,
-    alignItems: 'center',
-  },
-  vazioHistoricoTitulo: {
-    color: CORES.texto,
-    fontSize: 16,
-    fontWeight: '700',
-    marginTop: 12,
-    marginBottom: 4,
-  },
-  vazioHistoricoSubtitulo: {
-    color: CORES.textoSecundario,
-    fontSize: 13,
-    textAlign: 'center',
-    lineHeight: 18,
-    marginBottom: 20,
-  },
-  botaoIniciarDoModal: {
-    backgroundColor: CORES.primaria,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 10,
-  },
-  botaoIniciarDoModalTexto: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  itemChecklistHistorico: {
-    backgroundColor: CORES.fundo,
-    borderRadius: 10,
-    padding: 14,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: CORES.bordaSuave,
-  },
-  topoChecklistLinha: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  badgeTipoChecklist: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  badgeTipoEntrada: {
-    backgroundColor: '#1E3A8A',
-  },
-  badgeTipoSaida: {
-    backgroundColor: '#065F46',
-  },
-  badgeTipoTexto: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  dataChecklistText: {
-    color: CORES.textoMudo,
-    fontSize: 12,
-  },
-  metricasChecklist: {
-    flexDirection: 'row',
-    gap: 14,
-    marginBottom: 8,
-  },
-  metricaText: {
-    color: CORES.textoSecundario,
-    fontSize: 13,
-  },
-  obsChecklistText: {
-    color: CORES.texto,
-    fontSize: 13,
-    fontStyle: 'italic',
-    marginBottom: 6,
-  },
-  pertencesLinha: {
-    flexDirection: 'row',
-    gap: 6,
-    flexWrap: 'wrap',
-  },
-  pertencesLabel: {
-    color: CORES.textoMudo,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  pertencesValores: {
-    color: CORES.textoSecundario,
-    fontSize: 12,
-    flex: 1,
-  },
-  botaoFecharModal: {
-    backgroundColor: CORES.superficieClara,
-    paddingVertical: 14,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  botaoFecharModalTexto: {
-    color: CORES.texto,
-    fontSize: 15,
-    fontWeight: '700',
   },
 });

@@ -1,4 +1,5 @@
 import { clienteHttp, obterBaseUrlAtual } from './clienteHttp';
+import * as FileSystem from 'expo-file-system/legacy';
 import {
   PerguntaChecklist,
   PedidoChecklist,
@@ -24,10 +25,38 @@ export const checklistApi = {
   },
 
   /**
+   * Obtém a URL legível/assinada para exibir uma imagem ou assinatura.
+   * Suporta rotas locais (/api/arquivos/local/...) e URLs assinadas do Cloud Storage.
+   */
+  async obterUrlLeitura(caminho: string): Promise<string> {
+    if (!caminho || caminho.trim() === '') {
+      return '';
+    }
+    if (caminho.startsWith('http://') || caminho.startsWith('https://')) {
+      return caminho;
+    }
+    try {
+      const response = await clienteHttp.post<{ url: string }>(
+        `/api/arquivos/url-de-leitura?caminho=${encodeURIComponent(caminho)}`
+      );
+      const url = response.data?.url || '';
+      if (!url) return '';
+      if (url.startsWith('http://') || url.startsWith('https://')) {
+        return url;
+      }
+      return `${obterBaseUrlAtual()}${url.startsWith('/') ? '' : '/'}${url}`;
+    } catch {
+      // Fallback para rota local de arquivos
+      const limpo = caminho.startsWith('/') ? caminho.substring(1) : caminho;
+      return `${obterBaseUrlAtual()}/api/arquivos/local/${limpo}`;
+    }
+  },
+
+  /**
    * Solicita autorização / URL assinada para upload de imagem ou assinatura.
    */
   async pedirUrlUpload(
-    pasta: 'avarias' | 'assinaturas',
+    pasta: 'avarias' | 'assinaturas' | 'checklists' | string,
     nomeArquivo: string,
     tipoDeConteudo: string
   ): Promise<UrlDeUpload> {
@@ -41,7 +70,7 @@ export const checklistApi = {
 
   /**
    * Envia os bytes de uma foto para a URL de envio (pode ser Cloud Storage ou endpoint local).
-   * ATENÇÃO: NÃO envia o cabeçalho Authorization do Spring no PUT.
+   * Utiliza upload nativo via FileSystem.uploadAsync para evitar erros de Blob/ArrayBuffer no React Native.
    */
   async enviarFotoArquivo(
     urlDeEnvio: string,
@@ -52,25 +81,22 @@ export const checklistApi = {
       ? urlDeEnvio
       : `${obterBaseUrlAtual()}${urlDeEnvio}`;
 
-    // Converte o arquivo local em blob para upload binário PUT
-    const responseLocal = await fetch(localUri);
-    const blob = await responseLocal.blob();
-
-    const uploadResponse = await fetch(urlDestino, {
-      method: 'PUT',
+    const uploadResponse = await FileSystem.uploadAsync(urlDestino, localUri, {
+      httpMethod: 'PUT',
+      uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
       headers: {
         'Content-Type': tipoDeConteudo,
       },
-      body: blob,
     });
 
-    if (!uploadResponse.ok) {
-      throw new Error(`Falha no upload da foto (${uploadResponse.status} ${uploadResponse.statusText})`);
+    if (uploadResponse.status < 200 || uploadResponse.status >= 300) {
+      throw new Error(`Falha no upload da foto (${uploadResponse.status}): ${uploadResponse.body || 'Erro'}`);
     }
   },
 
   /**
    * Envia a assinatura digital (Base64 PNG) colhida na tela.
+   * Grava temporariamente no cache e faz upload nativo streaming PUT sem utilizar Blobs do JS.
    */
   async enviarAssinaturaBase64(
     urlDeEnvio: string,
@@ -82,25 +108,27 @@ export const checklistApi = {
 
     // Remove prefixo data:image/png;base64, se houver
     const limpo = base64Png.replace(/^data:image\/\w+;base64,/, '');
-    
-    // Converte Base64 para Uint8Array / Blob
-    const binaryString = atob(limpo);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-    const blob = new Blob([bytes], { type: 'image/png' });
 
-    const uploadResponse = await fetch(urlDestino, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'image/png',
-      },
-      body: blob,
-    });
+    const dir = FileSystem.cacheDirectory || FileSystem.documentDirectory || '';
+    const caminhoTemp = `${dir}temp_assinatura_${Date.now()}.png`;
+    try {
+      await FileSystem.writeAsStringAsync(caminhoTemp, limpo, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
 
-    if (!uploadResponse.ok) {
-      throw new Error(`Falha no upload da assinatura (${uploadResponse.status} ${uploadResponse.statusText})`);
+      const uploadResponse = await FileSystem.uploadAsync(urlDestino, caminhoTemp, {
+        httpMethod: 'PUT',
+        uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+        headers: {
+          'Content-Type': 'image/png',
+        },
+      });
+
+      if (uploadResponse.status < 200 || uploadResponse.status >= 300) {
+        throw new Error(`Falha no upload da assinatura (${uploadResponse.status}): ${uploadResponse.body || 'Erro'}`);
+      }
+    } finally {
+      await FileSystem.deleteAsync(caminhoTemp, { idempotent: true }).catch(() => {});
     }
   },
 

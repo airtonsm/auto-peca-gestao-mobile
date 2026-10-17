@@ -5,10 +5,10 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  SafeAreaView,
   Alert,
   ActivityIndicator,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { CORES } from '../constants';
@@ -17,6 +17,7 @@ import { ConfiguradorServidorModal } from '../components/ConfiguradorServidorMod
 import { authApi } from '../api/authApi';
 
 export const PerfilScreen: React.FC = () => {
+  const insets = useSafeAreaInsets();
   const {
     usuario,
     oficinaAtiva,
@@ -87,8 +88,8 @@ export const PerfilScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+    <View style={styles.container}>
+      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 80 }]}>
         {/* Card do Usuário */}
         <View style={styles.cardUsuario}>
           <View style={styles.avatarBox}>
@@ -235,7 +236,7 @@ export const PerfilScreen: React.FC = () => {
 
         {/* Informações de Versão */}
         <Text style={styles.versaoTexto}>
-          Auto-Peça & Gestão Mobile v1.0.0 (Build Produção)
+          AutoF Sistema de Gestão Mobile v1.0.0 (Build Produção)
         </Text>
       </ScrollView>
 
@@ -244,7 +245,7 @@ export const PerfilScreen: React.FC = () => {
         visivel={modalServidorVisivel}
         aoFechar={() => setModalServidorVisivel(false)}
       />
-    </SafeAreaView>
+    </View>
   );
 };
 
