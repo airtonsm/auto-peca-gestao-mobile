@@ -219,3 +219,55 @@ export interface PedidoItemPecaOS {
 export interface PedidoQuantidadeItemPecaOS {
   quantidade: number;
 }
+
+// ============================================================================
+// Tipos para Comunicação e Envio de WhatsApp da OS (ControladorComunicacao.java)
+// ============================================================================
+
+export interface ContatoDaOS {
+  id: string;
+  nome: string;
+  cargo?: string;
+  telefoneExibicao: string;
+  principal: boolean;
+}
+
+export interface RespostaConversaDaOS {
+  osId: string;
+  osNumero: number;
+  clienteId: string;
+  clienteNome: string;
+  contatos: ContatoDaOS[];
+  contatoId?: string;
+  escolhaLembrada: boolean;
+  conversa?: {
+    id: string;
+    canal: string;
+    identificador: string;
+    status: string;
+    janelaAberta: boolean;
+    segundosRestantes: number;
+  };
+}
+
+export interface PedidoEnvioMensagemOS {
+  clienteId: string;
+  contatoId?: string;
+  osId: string;
+  canal: string;
+  corpo: string;
+  templateId?: string | null;
+}
+
+export interface RespostaTemplate {
+  id: string;
+  nome: string;
+  gatilho: string;
+  canal: string;
+  categoria: string;
+  categoriaAprovada?: string;
+  statusAprovacao: 'rascunho' | 'enviado' | 'aprovado' | 'recusado' | string;
+  aprovadoNoProvedor: boolean;
+  ativo: boolean;
+  referenciaProvedor?: string;
+}

@@ -15,6 +15,8 @@ import { RespostaChecklist, RespostaOSResumo } from '../types';
 import { CORES, ROTULOS_SECAO, REGIOES_AVARIA, TIPOS_AVARIA } from '../constants';
 import { PlacaVeiculo } from './PlacaVeiculo';
 import { checklistApi } from '../api/checklistApi';
+import { useAuth } from '../context/AuthContext';
+import { ModalEnviarWhatsAppChecklist } from './ModalEnviarWhatsAppChecklist';
 
 interface ChecklistDetalhesModalProps {
   visivel: boolean;
@@ -32,8 +34,10 @@ export const ChecklistDetalhesModal: React.FC<ChecklistDetalhesModalProps> = ({
   onIniciarSaida,
 }) => {
   const insets = useSafeAreaInsets();
+  const { oficinaAtiva, usuario } = useAuth();
   const [tipoSelecionado, setTipoSelecionado] = useState<'entrada' | 'saida'>('entrada');
   const [fotoAmpliadaUrl, setFotoAmpliadaUrl] = useState<string | null>(null);
+  const [modalWhatsAppVisivel, setModalWhatsAppVisivel] = useState(false);
 
   // Mapas de URLs assinadas/locais resolvidas para avarias e assinatura
   const [urlsResolvidas, setUrlsResolvidas] = useState<Record<string, string>>({});
@@ -164,9 +168,18 @@ export const ChecklistDetalhesModal: React.FC<ChecklistDetalhesModalProps> = ({
                 Cliente: {os.clienteNome || 'Não informado'}
               </Text>
             </View>
-            <TouchableOpacity onPress={onFechar} style={styles.botaoFecharIcone}>
-              <Ionicons name="close" size={26} color={CORES.texto} />
-            </TouchableOpacity>
+            <View style={styles.headerAcoesLinha}>
+              <TouchableOpacity
+                onPress={() => setModalWhatsAppVisivel(true)}
+                style={styles.botaoWhatsAppIconeHeader}
+                accessibilityLabel="Compartilhar no WhatsApp"
+              >
+                <Ionicons name="logo-whatsapp" size={24} color="#25D366" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={onFechar} style={styles.botaoFecharIcone}>
+                <Ionicons name="close" size={26} color={CORES.texto} />
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Abas de Alternância: Entrada vs Saída */}
@@ -487,6 +500,15 @@ export const ChecklistDetalhesModal: React.FC<ChecklistDetalhesModalProps> = ({
 
           {/* Rodapé com Ações */}
           <View style={[styles.rodapeAcoes, { paddingBottom: Math.max(insets.bottom, 14) }]}>
+            {/* Botão Compartilhar no WhatsApp */}
+            <TouchableOpacity
+              style={styles.botaoCompartilharWhatsApp}
+              onPress={() => setModalWhatsAppVisivel(true)}
+            >
+              <Ionicons name="logo-whatsapp" size={18} color="#FFFFFF" />
+              <Text style={styles.botaoCompartilharWhatsAppTexto}>Compartilhar no WhatsApp</Text>
+            </TouchableOpacity>
+
             {temEntrada && !temSaida && onIniciarSaida && (
               <TouchableOpacity
                 style={styles.botaoIniciarSaida}
@@ -506,6 +528,15 @@ export const ChecklistDetalhesModal: React.FC<ChecklistDetalhesModalProps> = ({
           </View>
         </View>
       </View>
+
+      {/* Modal de Envio por WhatsApp */}
+      <ModalEnviarWhatsAppChecklist
+        visivel={modalWhatsAppVisivel}
+        onFechar={() => setModalWhatsAppVisivel(false)}
+        os={os}
+        checklist={checklistAtual}
+        nomeOficina={oficinaAtiva?.nome || usuario?.empresa}
+      />
 
       {/* Modal Foto em Tela Cheia */}
       {fotoAmpliadaUrl && (
@@ -1038,5 +1069,27 @@ const styles = StyleSheet.create({
   imagemFullscreen: {
     width: '100%',
     height: '80%',
+  },
+  headerAcoesLinha: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  botaoWhatsAppIconeHeader: {
+    padding: 4,
+  },
+  botaoCompartilharWhatsApp: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#25D366',
+    paddingVertical: 12,
+    borderRadius: 10,
+    gap: 8,
+  },
+  botaoCompartilharWhatsAppTexto: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
   },
 });

@@ -6,6 +6,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { CORES } from '../constants';
+import { AutoFLogo } from '../components/AutoFLogo';
 
 // Telas
 import { LoginScreen } from '../screens/LoginScreen';
@@ -88,7 +89,8 @@ export const AppNavigator: React.FC = () => {
   if (carregando) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={CORES.primaria} />
+        <AutoFLogo tamanho="grande" mostrarSubtitulo={false} orientacao="vertical" />
+        <ActivityIndicator size="large" color={CORES.primariaClara} style={styles.loadingSpinner} />
       </View>
     );
   }
@@ -128,5 +130,8 @@ const styles = StyleSheet.create({
     backgroundColor: CORES.fundo,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  loadingSpinner: {
+    marginTop: 28,
   },
 });

@@ -26,7 +26,10 @@ import {
   PedidoChecklist,
   RegiaoAvaria,
   TipoAvaria,
+  RespostaChecklist,
 } from '../types';
+import { useAuth } from '../context/AuthContext';
+import { ModalEnviarWhatsAppChecklist } from '../components/ModalEnviarWhatsAppChecklist';
 import {
   CORES,
   PERTENCES_SUGERIDOS,
@@ -46,6 +49,7 @@ interface ChecklistRouteParams {
   placa: string;
   veiculoDescricao: string;
   clienteNome: string;
+  clienteId?: string;
   tipoInicial?: 'entrada' | 'saida';
 }
 
@@ -105,7 +109,8 @@ export const ChecklistScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const route = useRoute<RouteProp<{ params: ChecklistRouteParams }, 'params'>>();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
-  const { osId, numero, placa, veiculoDescricao, clienteNome } = route.params;
+  const { osId, numero, placa, veiculoDescricao, clienteNome, clienteId } = route.params;
+  const { oficinaAtiva, usuario } = useAuth();
 
   // Estado do Wizard (Passos 1 a 5)
   const [passoAtual, setPassoAtual] = useState<number>(1);
@@ -152,6 +157,8 @@ export const ChecklistScreen: React.FC = () => {
   const [enviando, setEnviando] = useState<boolean>(false);
   const [etapaEnvioTexto, setEtapaEnvioTexto] = useState<string>('');
   const [sucessoConcluido, setSucessoConcluido] = useState<boolean>(false);
+  const [checklistSalvoParaWhatsApp, setChecklistSalvoParaWhatsApp] = useState<RespostaChecklist | null>(null);
+  const [modalWhatsAppVisivel, setModalWhatsAppVisivel] = useState<boolean>(false);
 
   // Controle de Rascunho e Recuperação contra encerramento de Activity no Android
   const [inicializado, setInicializado] = useState<boolean>(false);
@@ -705,13 +712,39 @@ export const ChecklistScreen: React.FC = () => {
       await checklistApi.gravarChecklist(osId, payload);
       await limparRascunhoLocal();
 
-      setEtapaEnvioTexto('Checklist gravado com sucesso!');
-      setSucessoConcluido(true);
+      // Monta a estrutura da vistoria recém-gravada para envio imediato por WhatsApp
+      const checklistRecemGravado: RespostaChecklist = {
+        id: 'recem-gravado',
+        osId,
+        tipo,
+        km: parseInt(km, 10),
+        nivelCombustivel,
+        pertences: pertencesSelecionados,
+        assinaturaUrl: caminhoAssinatura,
+        preenchidoEm: new Date().toISOString(),
+        itens: itensEnvio.map((it, idx) => ({
+          id: `item-${idx}`,
+          perguntaId: it.perguntaId,
+          secao: '',
+          pergunta: perguntas.find((p) => p.id === it.perguntaId)?.pergunta || '',
+          resposta: it.resposta,
+          observacao: it.observacao,
+          critico: perguntas.find((p) => p.id === it.perguntaId)?.critico || false,
+        })),
+        avarias: avariasParaEnvio.map((av, idx) => ({
+          id: `av-${idx}`,
+          regiao: av.regiao,
+          tipo: av.tipo,
+          descricao: av.descricao,
+          fotoUrl: av.fotoUrl,
+        })),
+        pendenciasCriticas: 0,
+        observacoes: observacoesGerais.trim() || undefined,
+      };
 
-      setTimeout(() => {
-        setEnviando(false);
-        navigation.goBack();
-      }, 1500);
+      setChecklistSalvoParaWhatsApp(checklistRecemGravado);
+      setEtapaEnvioTexto('Vistoria gravada e sincronizada com sucesso!');
+      setSucessoConcluido(true);
     } catch (e: any) {
       console.error('[Checklist] Erro ao submeter checklist:', e);
       setEnviando(false);
@@ -1440,17 +1473,68 @@ export const ChecklistScreen: React.FC = () => {
         <View style={styles.fundoModalEnvio}>
           <View style={styles.cardModalEnvio}>
             {sucessoConcluido ? (
-              <Ionicons name="checkmark-circle" size={60} color={CORES.sucesso} />
+              <>
+                <Ionicons name="checkmark-circle" size={60} color={CORES.sucesso} />
+                <Text style={styles.tituloModalEnvio}>Sucesso!</Text>
+                <Text style={styles.textoEtapaEnvio}>{etapaEnvioTexto}</Text>
+
+                <View style={styles.acoesSucessoEnvio}>
+                  <TouchableOpacity
+                    style={styles.botaoWhatsAppSucesso}
+                    onPress={() => setModalWhatsAppVisivel(true)}
+                  >
+                    <Ionicons name="logo-whatsapp" size={20} color="#FFFFFF" />
+                    <Text style={styles.botaoWhatsAppSucessoTexto}>
+                      Enviar Laudo ao Cliente via WhatsApp
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.botaoVoltarPatioSucesso}
+                    onPress={() => {
+                      setEnviando(false);
+                      navigation.goBack();
+                    }}
+                  >
+                    <Ionicons name="arrow-back" size={18} color={CORES.textoSecundario} />
+                    <Text style={styles.botaoVoltarPatioSucessoTexto}>
+                      Concluir e Voltar ao Pátio
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </>
             ) : (
-              <ActivityIndicator size="large" color={CORES.primaria} />
+              <>
+                <ActivityIndicator size="large" color={CORES.primaria} />
+                <Text style={styles.tituloModalEnvio}>Enviando Checklist</Text>
+                <Text style={styles.textoEtapaEnvio}>{etapaEnvioTexto}</Text>
+              </>
             )}
-            <Text style={styles.tituloModalEnvio}>
-              {sucessoConcluido ? 'Sucesso!' : 'Enviando Checklist'}
-            </Text>
-            <Text style={styles.textoEtapaEnvio}>{etapaEnvioTexto}</Text>
           </View>
         </View>
       </Modal>
+
+      {/* Modal de Envio do Laudo por WhatsApp */}
+      {checklistSalvoParaWhatsApp && (
+        <ModalEnviarWhatsAppChecklist
+          visivel={modalWhatsAppVisivel}
+          onFechar={() => setModalWhatsAppVisivel(false)}
+          os={{
+            id: osId,
+            numero,
+            status: 'recebido',
+            statusRotulo: 'Recebido',
+            clienteId: clienteId || '',
+            clienteNome,
+            veiculoId: '',
+            placa,
+            veiculoDescricao,
+            versao: 1,
+          }}
+          checklist={checklistSalvoParaWhatsApp}
+          nomeOficina={oficinaAtiva?.nome || usuario?.empresa}
+        />
+      )}
 
       {/* Modal Seletor de Região da Avaria */}
       <Modal
@@ -2227,6 +2311,47 @@ const styles = StyleSheet.create({
   textoEtapaEnvio: {
     color: CORES.textoSecundario,
     fontSize: 14,
+    textAlign: 'center',
+  },
+  acoesSucessoEnvio: {
+    width: '100%',
+    gap: 10,
+    marginTop: 8,
+  },
+  botaoWhatsAppSucesso: {
+    backgroundColor: '#25D366',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 13,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    gap: 8,
+    width: '100%',
+  },
+  botaoWhatsAppSucessoTexto: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  botaoVoltarPatioSucesso: {
+    backgroundColor: CORES.superficieClara,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 11,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: CORES.borda,
+    width: '100%',
+  },
+  botaoVoltarPatioSucessoTexto: {
+    color: CORES.texto,
+    fontSize: 13,
+    fontWeight: '700',
     textAlign: 'center',
   },
   // Botões diretos de avaria (Câmera e Galeria)

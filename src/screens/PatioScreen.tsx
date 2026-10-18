@@ -24,6 +24,8 @@ import { PlacaVeiculo } from '../components/PlacaVeiculo';
 import { StatusBadge } from '../components/StatusBadge';
 import { ChecklistDetalhesModal } from '../components/ChecklistDetalhesModal';
 import { ModalPecasOS } from '../components/ModalPecasOS';
+import { ModalEnviarWhatsAppChecklist } from '../components/ModalEnviarWhatsAppChecklist';
+import { useAuth } from '../context/AuthContext';
 
 const FILTROS_STATUS = [
   { chave: 'todos', rotulo: 'Todas' },
@@ -55,9 +57,37 @@ export const PatioScreen: React.FC = () => {
   const [modalPecasVisivel, setModalPecasVisivel] = useState(false);
   const [osPecasSelecionada, setOsPecasSelecionada] = useState<RespostaOSResumo | null>(null);
 
+  // Modal de envio do checklist por WhatsApp direto pelo card
+  const [modalWhatsAppCardVisivel, setModalWhatsAppCardVisivel] = useState(false);
+  const [osWhatsAppSelecionada, setOsWhatsAppSelecionada] = useState<RespostaOSResumo | null>(null);
+  const [checklistWhatsAppSelecionado, setChecklistWhatsAppSelecionado] = useState<RespostaChecklist | null>(null);
+
+  const { oficinaAtiva, usuario } = useAuth();
+
   const abrirModalPecas = (os: RespostaOSResumo) => {
     setOsPecasSelecionada(os);
     setModalPecasVisivel(true);
+  };
+
+  const abrirWhatsAppCard = async (os: RespostaOSResumo) => {
+    let chks = checklistsPorOS[os.id];
+    if (!chks || chks.length === 0) {
+      try {
+        chks = await checklistApi.obterChecklistsDaOS(os.id);
+        setChecklistsPorOS((prev) => ({ ...prev, [os.id]: chks || [] }));
+      } catch (e) {
+        console.warn('Erro ao carregar checklists da OS para WhatsApp:', e);
+      }
+    }
+    if (chks && chks.length > 0) {
+      setOsWhatsAppSelecionada(os);
+      const chkAtivo =
+        chks.find((c) => c.tipo === 'saida') ||
+        chks.find((c) => c.tipo === 'entrada') ||
+        chks[0];
+      setChecklistWhatsAppSelecionado(chkAtivo);
+      setModalWhatsAppCardVisivel(true);
+    }
   };
 
   const carregarOS = useCallback(async () => {
@@ -157,6 +187,7 @@ export const PatioScreen: React.FC = () => {
       placa: os.placa,
       veiculoDescricao: os.veiculoDescricao,
       clienteNome: os.clienteNome,
+      clienteId: os.clienteId,
       tipoInicial: tipoPreferencia,
     });
   };
@@ -248,49 +279,66 @@ export const PatioScreen: React.FC = () => {
         </View>
 
         {/* Barra de Ações: Peças e Checklists */}
-        <View style={styles.cardAcoes}>
-          {/* Botão de Peças da OS */}
-          <TouchableOpacity
-            style={styles.botaoPecasOS}
-            onPress={() => abrirModalPecas(item)}
-          >
-            <Ionicons name="cube" size={16} color="#38BDF8" />
-            <Text style={styles.botaoPecasOSTexto}>Peças</Text>
-            {item.aguardandoPeca && (
-              <View style={styles.pontoAguardandoPeca} />
-            )}
-          </TouchableOpacity>
-
-          {temChecklist ? (
-            <>
-              {/* Botão Principal: Mostrar Checklist */}
-              <TouchableOpacity
-                style={styles.botaoMostrarChecklist}
-                onPress={() => abrirDetalhesChecklist(item)}
-              >
-                <Ionicons name="eye-outline" size={18} color="#FFFFFF" />
-                <Text style={styles.botaoMostrarChecklistTexto}>Mostrar Checklist</Text>
-              </TouchableOpacity>
-
-              {/* Botão Secundário: Preencher Saída se apenas Entrada foi feita */}
-              {temEntrada && !temSaida && (
-                <TouchableOpacity
-                  style={styles.botaoFazerSaida}
-                  onPress={() => iniciarChecklist(item, 'saida')}
-                >
-                  <Ionicons name="exit-outline" size={16} color="#10B981" />
-                  <Text style={styles.botaoFazerSaidaTexto}>+ Saída</Text>
-                </TouchableOpacity>
-              )}
-            </>
-          ) : (
-            /* Botão Principal quando NÃO tem checklist preenchido: Fazer Checklist */
+        <View style={styles.cardAcoesContainer}>
+          <View style={styles.cardAcoesLinha}>
+            {/* Botão de Peças da OS */}
             <TouchableOpacity
-              style={styles.botaoFazerChecklist}
-              onPress={() => iniciarChecklist(item, 'entrada')}
+              style={styles.botaoPecasOS}
+              onPress={() => abrirModalPecas(item)}
             >
-              <Ionicons name="clipboard-outline" size={18} color="#FFFFFF" />
-              <Text style={styles.botaoFazerChecklistTexto}>Fazer Checklist</Text>
+              <Ionicons name="cube" size={16} color="#38BDF8" />
+              <Text style={styles.botaoPecasOSTexto}>Peças</Text>
+              {item.aguardandoPeca && (
+                <View style={styles.pontoAguardandoPeca} />
+              )}
+            </TouchableOpacity>
+
+            {temChecklist ? (
+              <>
+                {/* Botão Principal: Mostrar Checklist */}
+                <TouchableOpacity
+                  style={styles.botaoMostrarChecklist}
+                  onPress={() => abrirDetalhesChecklist(item)}
+                >
+                  <Ionicons name="eye-outline" size={18} color="#FFFFFF" />
+                  <Text style={styles.botaoMostrarChecklistTexto} numberOfLines={1}>
+                    Mostrar Checklist
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Botão Atalho WhatsApp */}
+                <TouchableOpacity
+                  style={styles.botaoWhatsAppCard}
+                  onPress={() => abrirWhatsAppCard(item)}
+                  accessibilityLabel="Compartilhar laudo no WhatsApp"
+                >
+                  <Ionicons name="logo-whatsapp" size={18} color="#25D366" />
+                </TouchableOpacity>
+              </>
+            ) : (
+              /* Botão Principal quando NÃO tem checklist preenchido: Fazer Checklist */
+              <TouchableOpacity
+                style={styles.botaoFazerChecklist}
+                onPress={() => iniciarChecklist(item, 'entrada')}
+              >
+                <Ionicons name="clipboard-outline" size={18} color="#FFFFFF" />
+                <Text style={styles.botaoFazerChecklistTexto} numberOfLines={1}>
+                  Fazer Checklist
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Botão Dedicado Linha 2: Preencher Saída se apenas Entrada foi feita */}
+          {temChecklist && temEntrada && !temSaida && (
+            <TouchableOpacity
+              style={styles.botaoFazerSaidaDedicado}
+              onPress={() => iniciarChecklist(item, 'saida')}
+            >
+              <Ionicons name="exit-outline" size={16} color="#10B981" />
+              <Text style={styles.botaoFazerSaidaDedicadoTexto}>
+                + Preencher Checklist de Saída
+              </Text>
             </TouchableOpacity>
           )}
         </View>
@@ -404,6 +452,19 @@ export const PatioScreen: React.FC = () => {
           setOsPecasSelecionada(null);
         }}
         aoAtualizarOS={carregarOS}
+      />
+
+      {/* Modal Rápido de Envio WhatsApp pelo Card da OS */}
+      <ModalEnviarWhatsAppChecklist
+        visivel={modalWhatsAppCardVisivel}
+        onFechar={() => {
+          setModalWhatsAppCardVisivel(false);
+          setOsWhatsAppSelecionada(null);
+          setChecklistWhatsAppSelecionado(null);
+        }}
+        os={osWhatsAppSelecionada}
+        checklist={checklistWhatsAppSelecionado}
+        nomeOficina={oficinaAtiva?.nome || usuario?.empresa}
       />
     </View>
   );
@@ -558,24 +619,28 @@ const styles = StyleSheet.create({
     color: CORES.textoMudo,
     fontSize: 13,
   },
-  cardAcoes: {
-    flexDirection: 'row',
-    gap: 10,
+  cardAcoesContainer: {
+    gap: 8,
     paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: CORES.bordaSuave,
+  },
+  cardAcoesLinha: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   botaoPecasOS: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 10,
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     borderRadius: 8,
     backgroundColor: 'rgba(56, 189, 248, 0.12)',
     borderWidth: 1,
     borderColor: 'rgba(56, 189, 248, 0.35)',
-    gap: 6,
+    gap: 5,
   },
   botaoPecasOSTexto: {
     color: '#38BDF8',
@@ -642,29 +707,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 10,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     borderRadius: 8,
     backgroundColor: '#2563EB',
     gap: 6,
   },
   botaoMostrarChecklistTexto: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '800',
   },
-  botaoFazerSaida: {
+  botaoFazerSaidaDedicado: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 10,
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     borderRadius: 8,
     backgroundColor: 'rgba(16, 185, 129, 0.12)',
     borderWidth: 1,
     borderColor: '#10B981',
-    gap: 4,
+    gap: 6,
+    width: '100%',
   },
-  botaoFazerSaidaTexto: {
+  botaoFazerSaidaDedicadoTexto: {
     color: '#10B981',
     fontSize: 13,
     fontWeight: '800',
@@ -703,5 +769,15 @@ const styles = StyleSheet.create({
     fontSize: 13,
     textAlign: 'center',
     lineHeight: 18,
+  },
+  botaoWhatsAppCard: {
+    backgroundColor: 'rgba(37, 211, 102, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(37, 211, 102, 0.3)',
+    borderRadius: 8,
+    width: 42,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
