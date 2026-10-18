@@ -144,7 +144,7 @@ export const LoginScreen: React.FC = () => {
                 <ActivityIndicator size="small" color="#FFFFFF" />
               ) : (
                 <>
-                  <Text style={styles.botaoEntrarTexto}>Acessar Pátio & Estoque</Text>
+                  <Text style={styles.botaoEntrarTexto}>Acessar</Text>
                   <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
                 </>
               )}

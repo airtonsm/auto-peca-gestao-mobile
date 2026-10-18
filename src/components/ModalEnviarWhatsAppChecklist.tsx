@@ -432,10 +432,7 @@ export const ModalEnviarWhatsAppChecklist: React.FC<ModalEnviarWhatsAppChecklist
                 )}
                 <View style={styles.botaoCanalOficialTextoCol}>
                   <Text style={styles.botaoCanalOficialTitulo}>
-                    {enviandoOficial ? 'Enviando...' : 'Enviar pelo Canal Oficial (API)'}
-                  </Text>
-                  <Text style={styles.botaoCanalOficialSubtitulo}>
-                    Dispara pelo canal oficial com template aprovado ({templateAprovado.nome})
+                    {enviandoOficial ? 'Enviando...' : 'Enviar pelo Canal Oficial'}
                   </Text>
                 </View>
               </TouchableOpacity>
