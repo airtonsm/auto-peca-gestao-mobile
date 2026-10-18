@@ -61,10 +61,10 @@ const AbasPrincipais = () => {
         name="Estoque"
         component={EstoqueScreen}
         options={{
-          title: 'Estoque de Peças',
-          tabBarLabel: 'Estoque',
+          title: 'Consulta de Estoque',
+          tabBarLabel: 'Consultar Estoque',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="cube" size={size} color={color} />
+            <Ionicons name="search" size={size} color={color} />
           ),
         }}
       />

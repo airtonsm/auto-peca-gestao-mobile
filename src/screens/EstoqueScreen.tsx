@@ -33,6 +33,7 @@ export const EstoqueScreen: React.FC = () => {
   const [erro, setErro] = useState<string | null>(null);
   const [scannerVisivel, setScannerVisivel] = useState(false);
   const [pecaSelecionada, setPecaSelecionada] = useState<RespostaPeca | null>(null);
+  const [filtroDisponibilidade, setFiltroDisponibilidade] = useState<'todos' | 'com-saldo' | 'zerados'>('todos');
 
   // Estados para lançamento da peça em uma OS aberta
   const [modalSelecaoOSVisivel, setModalSelecaoOSVisivel] = useState(false);
@@ -99,6 +100,25 @@ export const EstoqueScreen: React.FC = () => {
       setSalvandoLancamento(false);
     }
   };
+
+  const pecasFiltradas = useMemo(() => {
+    if (filtroDisponibilidade === 'com-saldo') {
+      return pecas.filter((p) => (p.disponivel || 0) > 0);
+    }
+    if (filtroDisponibilidade === 'zerados') {
+      return pecas.filter((p) => (p.disponivel || 0) <= 0);
+    }
+    return pecas;
+  }, [pecas, filtroDisponibilidade]);
+
+  const totalComSaldo = useMemo(
+    () => pecas.filter((p) => (p.disponivel || 0) > 0).length,
+    [pecas]
+  );
+  const totalZerados = useMemo(
+    () => pecas.filter((p) => (p.disponivel || 0) <= 0).length,
+    [pecas]
+  );
 
   const ordensServicoFiltradas = useMemo(() => {
     if (!buscaOS.trim()) return ordensServico;
@@ -232,15 +252,10 @@ export const EstoqueScreen: React.FC = () => {
           </View>
         )}
 
-        {/* Ação rápida: Lançar na OS */}
-        <View style={styles.cardAcaoLinha}>
-          <TouchableOpacity
-            style={styles.botaoLancarOSCard}
-            onPress={() => abrirSelecaoOSParaPeca(item)}
-          >
-            <Ionicons name="clipboard" size={14} color="#38BDF8" />
-            <Text style={styles.botaoLancarOSCardTexto}>Lançar na OS</Text>
-          </TouchableOpacity>
+        {/* Dica de toque para ver especificações completas */}
+        <View style={styles.cardToqueDica}>
+          <Text style={styles.cardToqueDicaTexto}>Toque para ver ficha técnica e dados</Text>
+          <Ionicons name="chevron-forward" size={14} color={CORES.textoMudo} />
         </View>
       </TouchableOpacity>
     );
@@ -276,6 +291,70 @@ export const EstoqueScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
+      {/* Filtros Rápidos de Disponibilidade */}
+      <View style={styles.filtrosEstoqueContainer}>
+        <TouchableOpacity
+          style={[
+            styles.chipFiltroEstoque,
+            filtroDisponibilidade === 'todos' && styles.chipFiltroEstoqueAtivo,
+          ]}
+          onPress={() => setFiltroDisponibilidade('todos')}
+        >
+          <Text
+            style={[
+              styles.chipFiltroEstoqueTexto,
+              filtroDisponibilidade === 'todos' && styles.chipFiltroEstoqueTextoAtivo,
+            ]}
+          >
+            Todas ({pecas.length})
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.chipFiltroEstoque,
+            filtroDisponibilidade === 'com-saldo' && styles.chipFiltroEstoqueAtivo,
+          ]}
+          onPress={() => setFiltroDisponibilidade('com-saldo')}
+        >
+          <Ionicons
+            name="checkmark-circle"
+            size={13}
+            color={filtroDisponibilidade === 'com-saldo' ? '#FFFFFF' : CORES.sucessoTexto}
+          />
+          <Text
+            style={[
+              styles.chipFiltroEstoqueTexto,
+              filtroDisponibilidade === 'com-saldo' && styles.chipFiltroEstoqueTextoAtivo,
+            ]}
+          >
+            Em Estoque ({totalComSaldo})
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.chipFiltroEstoque,
+            filtroDisponibilidade === 'zerados' && styles.chipFiltroEstoqueAtivo,
+          ]}
+          onPress={() => setFiltroDisponibilidade('zerados')}
+        >
+          <Ionicons
+            name="alert-circle"
+            size={13}
+            color={filtroDisponibilidade === 'zerados' ? '#FFFFFF' : CORES.perigoTexto}
+          />
+          <Text
+            style={[
+              styles.chipFiltroEstoqueTexto,
+              filtroDisponibilidade === 'zerados' && styles.chipFiltroEstoqueTextoAtivo,
+            ]}
+          >
+            Sem Saldo ({totalZerados})
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Mensagem de Erro se houver */}
       {erro && (
         <View style={styles.erroBox}>
@@ -291,11 +370,11 @@ export const EstoqueScreen: React.FC = () => {
       {carregando && !recarregando ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={CORES.primaria} />
-          <Text style={styles.loadingTexto}>Consultando estoque da oficina...</Text>
+          <Text style={styles.loadingTexto}>Consultando catálogo e saldo físico...</Text>
         </View>
       ) : (
         <FlatList
-          data={pecas}
+          data={pecasFiltradas}
           keyExtractor={(item) => item.id}
           renderItem={renderItemPeca}
           contentContainerStyle={[styles.listaConteudo, { paddingBottom: insets.bottom + 80 }]}
@@ -314,14 +393,19 @@ export const EstoqueScreen: React.FC = () => {
               <Text style={styles.vazioSubtitulo}>
                 {termoBusca
                   ? `Não encontramos itens correspondentes a "${termoBusca}". Tente outro código ou escaneie o código de barras da peça.`
+                  : filtroDisponibilidade !== 'todos'
+                  ? 'Nenhuma peça correspondente ao filtro de estoque selecionado.'
                   : 'Nenhuma peça cadastrada no catálogo desta oficina.'}
               </Text>
-              {termoBusca ? (
+              {termoBusca || filtroDisponibilidade !== 'todos' ? (
                 <TouchableOpacity
                   style={styles.botaoLimparFiltros}
-                  onPress={() => setTermoBusca('')}
+                  onPress={() => {
+                    setTermoBusca('');
+                    setFiltroDisponibilidade('todos');
+                  }}
                 >
-                  <Text style={styles.botaoLimparFiltrosTexto}>Limpar Busca</Text>
+                  <Text style={styles.botaoLimparFiltrosTexto}>Limpar Filtros</Text>
                 </TouchableOpacity>
               ) : null}
             </View>
@@ -422,6 +506,13 @@ export const EstoqueScreen: React.FC = () => {
             {/* Ações da Ficha */}
             <View style={[styles.acoesModalDetalhe, { marginBottom: Math.max(insets.bottom, 12) }]}>
               <TouchableOpacity
+                style={styles.botaoFecharModalDetalhe}
+                onPress={() => setPecaSelecionada(null)}
+              >
+                <Text style={styles.botaoFecharModalDetalheTexto}>Fechar Ficha</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
                 style={styles.botaoLancarNaOSModal}
                 onPress={() => {
                   const p = pecaSelecionada;
@@ -429,15 +520,8 @@ export const EstoqueScreen: React.FC = () => {
                   if (p) abrirSelecaoOSParaPeca(p);
                 }}
               >
-                <Ionicons name="clipboard" size={18} color="#FFFFFF" />
-                <Text style={styles.botaoLancarNaOSModalTexto}>Lançar nesta Peça na OS</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.botaoFecharModalDetalhe}
-                onPress={() => setPecaSelecionada(null)}
-              >
-                <Text style={styles.botaoFecharModalDetalheTexto}>Fechar</Text>
+                <Ionicons name="clipboard-outline" size={16} color="#38BDF8" />
+                <Text style={styles.botaoLancarNaOSModalTexto}>Vincular à OS</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -851,6 +935,57 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
   },
+  filtrosEstoqueContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 8,
+    backgroundColor: CORES.superficie,
+    borderBottomWidth: 1,
+    borderBottomColor: CORES.bordaSuave,
+  },
+  chipFiltroEstoque: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 9999,
+    backgroundColor: CORES.superficieClara,
+    borderWidth: 1,
+    borderColor: CORES.borda,
+    gap: 6,
+  },
+  chipFiltroEstoqueAtivo: {
+    backgroundColor: CORES.primaria,
+    borderColor: CORES.primariaClara,
+  },
+  chipFiltroEstoqueTexto: {
+    color: CORES.textoSecundario,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  chipFiltroEstoqueTextoAtivo: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+  },
+  cardToqueDica: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  cardToqueDicaTexto: {
+    color: CORES.textoMudo,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  acoesModalDetalhe: {
+    flexDirection: 'row',
+    gap: 10,
+  },
   botaoFecharModalDetalhe: {
     flex: 1,
     backgroundColor: CORES.superficieClara,
@@ -862,40 +997,15 @@ const styles = StyleSheet.create({
   },
   botaoFecharModalDetalheTexto: {
     color: CORES.texto,
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
   },
-  cardAcaoLinha: {
-    marginTop: 10,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: CORES.bordaSuave,
-    alignItems: 'flex-end',
-  },
-  botaoLancarOSCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(56, 189, 248, 0.12)',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(56, 189, 248, 0.35)',
-    gap: 6,
-  },
-  botaoLancarOSCardTexto: {
-    color: '#38BDF8',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  acoesModalDetalhe: {
-    flexDirection: 'row',
-    gap: 10,
-  },
   botaoLancarNaOSModal: {
-    flex: 2,
+    flex: 1,
     flexDirection: 'row',
-    backgroundColor: CORES.primaria,
+    backgroundColor: '#0C4A6E',
+    borderWidth: 1,
+    borderColor: '#0284C7',
     paddingVertical: 14,
     borderRadius: 10,
     alignItems: 'center',
@@ -903,9 +1013,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   botaoLancarNaOSModalTexto: {
-    color: '#FFFFFF',
+    color: '#38BDF8',
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '700',
   },
   fundoModalSelecaoOS: {
     flex: 1,

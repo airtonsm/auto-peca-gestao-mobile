@@ -447,22 +447,34 @@ export const PatioScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      {/* Barra de Busca de OS */}
+      {/* Barra de Busca de OS e Atalho para Consulta de Estoque */}
       <View style={styles.topoSecao}>
-        <View style={styles.inputBuscaContainer}>
-          <Ionicons name="search" size={20} color={CORES.textoMudo} style={styles.iconeBusca} />
-          <TextInput
-            style={styles.inputBusca}
-            placeholder="Buscar por placa, cliente ou veículo..."
-            placeholderTextColor={CORES.textoMudo}
-            value={termoBusca}
-            onChangeText={setTermoBusca}
-          />
-          {termoBusca.length > 0 && (
-            <TouchableOpacity onPress={() => setTermoBusca('')}>
-              <Ionicons name="close-circle" size={18} color={CORES.textoMudo} />
-            </TouchableOpacity>
-          )}
+        <View style={styles.linhaBuscaComAtalho}>
+          <View style={styles.inputBuscaContainer}>
+            <Ionicons name="search" size={20} color={CORES.textoMudo} style={styles.iconeBusca} />
+            <TextInput
+              style={styles.inputBusca}
+              placeholder="Buscar por placa, cliente ou veículo..."
+              placeholderTextColor={CORES.textoMudo}
+              value={termoBusca}
+              onChangeText={setTermoBusca}
+            />
+            {termoBusca.length > 0 && (
+              <TouchableOpacity onPress={() => setTermoBusca('')}>
+                <Ionicons name="close-circle" size={18} color={CORES.textoMudo} />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Botão Atalho para Consultar Estoque diretamente sem entrar em OS */}
+          <TouchableOpacity
+            style={styles.botaoAtalhoConsultaEstoque}
+            onPress={() => navigation.navigate('Estoque')}
+            accessibilityLabel="Consultar estoque de peças"
+          >
+            <Ionicons name="cube-outline" size={18} color="#38BDF8" />
+            <Text style={styles.botaoAtalhoConsultaEstoqueTexto}>Estoque</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Pills de Filtro por Status */}
@@ -592,16 +604,38 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: CORES.bordaSuave,
   },
+  linhaBuscaComAtalho: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    gap: 10,
+  },
   inputBuscaContainer: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: CORES.fundo,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: CORES.borda,
-    marginHorizontal: 16,
     paddingHorizontal: 12,
     height: 44,
+  },
+  botaoAtalhoConsultaEstoque: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0C4A6E',
+    borderWidth: 1,
+    borderColor: '#0284C7',
+    paddingHorizontal: 12,
+    height: 44,
+    borderRadius: 10,
+    gap: 6,
+  },
+  botaoAtalhoConsultaEstoqueTexto: {
+    color: '#38BDF8',
+    fontSize: 13,
+    fontWeight: '700',
   },
   iconeBusca: {
     marginRight: 8,
