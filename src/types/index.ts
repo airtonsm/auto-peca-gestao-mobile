@@ -291,3 +291,80 @@ export interface RespostaTemplate {
   ativo: boolean;
   referenciaProvedor?: string;
 }
+
+// ============================================================================
+// Tipos para Abertura de Nova OS, Veículos, Clientes e Boxes
+// ============================================================================
+
+export interface RespostaVeiculo {
+  id: string;
+  clienteId: string;
+  clienteNome: string;
+  placa: string;
+  marca?: string;
+  modelo?: string;
+  versao?: string;
+  descricao: string;
+  anoFabricacao?: number;
+  anoModelo?: number;
+  cor?: string;
+  kmAtual: number;
+  observacoes?: string;
+  ativo: boolean;
+}
+
+export interface PedidoCriarVeiculo {
+  clienteId: string;
+  placa: string;
+  marca?: string;
+  modelo?: string;
+  versao?: string;
+  anoFabricacao?: number;
+  anoModelo?: number;
+  cor?: string;
+  kmAtual?: number;
+  observacoes?: string;
+}
+
+export interface RespostaCliente {
+  id: string;
+  nome: string;
+  documento?: string;
+  telefone?: string;
+  email?: string;
+  tipo?: 'pf' | 'pj' | string;
+  ativo?: boolean;
+}
+
+export interface PedidoCriarCliente {
+  tipo: 'pf' | 'pj';
+  nome: string;
+  documento?: string;
+  contatos?: {
+    nome: string;
+    telefone: string;
+    whatsapp: boolean;
+    principal: boolean;
+  }[];
+}
+
+export interface RespostaBox {
+  id: string;
+  nome: string;
+  tipo?: string;
+  ativo: boolean;
+}
+
+export interface PedidoCriarOS {
+  clienteId: string;
+  veiculoId: string;
+  tipo?: string;
+  prioridade?: string;
+  boxId?: string | null;
+  kmEntrada?: number | null;
+  queixaCliente?: string;
+  diagnostico?: string;
+  observacoes?: string;
+  status: 'recebido' | 'agendado';
+  confirmarKmMenor?: boolean;
+}

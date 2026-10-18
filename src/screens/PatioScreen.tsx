@@ -26,6 +26,7 @@ import { ChecklistDetalhesModal } from '../components/ChecklistDetalhesModal';
 import { ModalPecasOS } from '../components/ModalPecasOS';
 import { ModalEnviarWhatsAppChecklist } from '../components/ModalEnviarWhatsAppChecklist';
 import { ModalMudarStatusOS } from '../components/ModalMudarStatusOS';
+import { ModalNovaOS } from '../components/ModalNovaOS';
 import {
   normalizarChaveStatus,
   obterProximoPassoRecomendado,
@@ -75,7 +76,19 @@ export const PatioScreen: React.FC = () => {
   const [modalStatusVisivel, setModalStatusVisivel] = useState(false);
   const [osStatusSelecionada, setOsStatusSelecionada] = useState<RespostaOSResumo | null>(null);
 
+  // Modal para abertura de Nova Ordem de Serviço
+  const [modalNovaOSVisivel, setModalNovaOSVisivel] = useState(false);
+
   const { oficinaAtiva, usuario } = useAuth();
+
+  const handleOSCriadaComSucesso = (novaOS: RespostaOSResumo) => {
+    setOrdens((prev) => [novaOS, ...prev]);
+    carregarOS();
+  };
+
+  const handleIniciarChecklistAposCriar = (novaOS: RespostaOSResumo) => {
+    iniciarChecklist(novaOS, 'entrada');
+  };
 
   const abrirModalMudarStatus = (os: RespostaOSResumo) => {
     setOsStatusSelecionada(os);
@@ -447,9 +460,42 @@ export const PatioScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      {/* Barra de Busca de OS e Atalho para Consulta de Estoque */}
+      {/* Barra de Busca de OS e Ações Rápidas (Nova OS e Estoque) */}
       <View style={styles.topoSecao}>
-        <View style={styles.linhaBuscaComAtalho}>
+        <View style={styles.cabecalhoAcoesPatio}>
+          <View style={styles.cabecalhoTituloCol}>
+            <Text style={styles.cabecalhoTituloTexto}>Pátio de Veículos</Text>
+            <Text style={styles.cabecalhoContadorTexto}>
+              {ordens.length} {ordens.length === 1 ? 'OS aberta' : 'OSs abertas'}
+            </Text>
+          </View>
+
+          <View style={styles.cabecalhoBotoesLinha}>
+            {/* Botão Atalho para Consultar Estoque diretamente */}
+            <TouchableOpacity
+              style={styles.botaoAtalhoConsultaEstoque}
+              onPress={() => navigation.navigate('Estoque')}
+              accessibilityLabel="Consultar estoque de peças"
+            >
+              <Ionicons name="cube-outline" size={16} color="#38BDF8" />
+              <Text style={styles.botaoAtalhoConsultaEstoqueTexto}>Estoque</Text>
+            </TouchableOpacity>
+
+            {/* Botão + Nova OS */}
+            <TouchableOpacity
+              style={styles.botaoNovaOS}
+              onPress={() => setModalNovaOSVisivel(true)}
+              accessibilityLabel="Abrir nova ordem de serviço"
+              activeOpacity={0.8}
+            >
+              <Ionicons name="add-circle" size={18} color="#FFFFFF" />
+              <Text style={styles.botaoNovaOSTexto}>Nova OS</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Linha de Busca de OS por Placa ou Cliente */}
+        <View style={styles.linhaBusca}>
           <View style={styles.inputBuscaContainer}>
             <Ionicons name="search" size={20} color={CORES.textoMudo} style={styles.iconeBusca} />
             <TextInput
@@ -465,16 +511,6 @@ export const PatioScreen: React.FC = () => {
               </TouchableOpacity>
             )}
           </View>
-
-          {/* Botão Atalho para Consultar Estoque diretamente sem entrar em OS */}
-          <TouchableOpacity
-            style={styles.botaoAtalhoConsultaEstoque}
-            onPress={() => navigation.navigate('Estoque')}
-            accessibilityLabel="Consultar estoque de peças"
-          >
-            <Ionicons name="cube-outline" size={18} color="#38BDF8" />
-            <Text style={styles.botaoAtalhoConsultaEstoqueTexto}>Estoque</Text>
-          </TouchableOpacity>
         </View>
 
         {/* Pills de Filtro por Status */}
@@ -589,6 +625,24 @@ export const PatioScreen: React.FC = () => {
         aoMudarStatusSucesso={handleStatusAtualizadoComSucesso}
         aoSolicitarRecarregar={carregarOS}
       />
+
+      {/* Botão Flutuante (FAB) para Abertura Rápida de Nova OS */}
+      <TouchableOpacity
+        style={[styles.fabNovaOS, { bottom: insets.bottom + 16 }]}
+        onPress={() => setModalNovaOSVisivel(true)}
+        activeOpacity={0.85}
+        accessibilityLabel="Abrir nova Ordem de Serviço"
+      >
+        <Ionicons name="add" size={30} color="#FFFFFF" />
+      </TouchableOpacity>
+
+      {/* Modal de Abertura de Nova OS */}
+      <ModalNovaOS
+        visivel={modalNovaOSVisivel}
+        aoFechar={() => setModalNovaOSVisivel(false)}
+        aoOSCriadaComSucesso={handleOSCriadaComSucesso}
+        aoIniciarChecklistAposCriar={handleIniciarChecklistAposCriar}
+      />
     </View>
   );
 };
@@ -604,14 +658,66 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: CORES.bordaSuave,
   },
-  linhaBuscaComAtalho: {
+  cabecalhoAcoesPatio: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+  },
+  cabecalhoTituloCol: {
+    flex: 1,
+  },
+  cabecalhoTituloTexto: {
+    color: CORES.texto,
+    fontSize: 17,
+    fontWeight: '800',
+  },
+  cabecalhoContadorTexto: {
+    color: CORES.textoSecundario,
+    fontSize: 12,
+    marginTop: 1,
+  },
+  cabecalhoBotoesLinha: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: 16,
-    gap: 10,
+    gap: 8,
+  },
+  botaoNovaOS: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2563EB',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+    gap: 6,
+    elevation: 3,
+  },
+  botaoNovaOSTexto: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  botaoAtalhoConsultaEstoque: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0C4A6E',
+    borderWidth: 1,
+    borderColor: '#0284C7',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 8,
+    gap: 5,
+  },
+  botaoAtalhoConsultaEstoqueTexto: {
+    color: '#38BDF8',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  linhaBusca: {
+    paddingHorizontal: 16,
   },
   inputBuscaContainer: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: CORES.fundo,
@@ -621,21 +727,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     height: 44,
   },
-  botaoAtalhoConsultaEstoque: {
-    flexDirection: 'row',
+  fabNovaOS: {
+    position: 'absolute',
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#2563EB',
+    justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#0C4A6E',
-    borderWidth: 1,
-    borderColor: '#0284C7',
-    paddingHorizontal: 12,
-    height: 44,
-    borderRadius: 10,
-    gap: 6,
-  },
-  botaoAtalhoConsultaEstoqueTexto: {
-    color: '#38BDF8',
-    fontSize: 13,
-    fontWeight: '700',
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 5,
+    zIndex: 99,
   },
   iconeBusca: {
     marginRight: 8,
