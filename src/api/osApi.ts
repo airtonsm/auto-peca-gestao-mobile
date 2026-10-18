@@ -1,5 +1,5 @@
 import { clienteHttp } from './clienteHttp';
-import { RespostaOSResumo } from '../types';
+import { RespostaOSResumo, PedidoTransicaoStatusOS } from '../types';
 
 export const osApi = {
   /**
@@ -21,6 +21,15 @@ export const osApi = {
    */
   async obterPorId(id: string): Promise<any> {
     const response = await clienteHttp.get(`/api/os/${id}`);
+    return response.data;
+  },
+
+  /**
+   * Transiciona o status da Ordem de Serviço no backend com suporte a bloqueio otimista via campo versao.
+   * Rota: POST /api/os/{osId}/status
+   */
+  async mudarStatus(osId: string, pedido: PedidoTransicaoStatusOS): Promise<any> {
+    const response = await clienteHttp.post(`/api/os/${osId}/status`, pedido);
     return response.data;
   },
 };

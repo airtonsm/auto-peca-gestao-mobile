@@ -81,6 +81,26 @@ export interface RespostaOSResumo {
   versao: number;
 }
 
+// ============================================================================
+// Tipos para Transição e Mudança de Status da OS (ControladorOrdemServico.java)
+// ============================================================================
+
+export interface PedidoTransicaoStatusOS {
+  status: string;
+  versao: number;
+  motivo?: string;
+  boxId?: string | null;
+}
+
+export interface StatusTransicaoInfo {
+  chave: string;
+  rotulo: string;
+  descricao: string;
+  icone: string;
+  cor: string;
+  destaque?: boolean;
+}
+
 export interface PerguntaChecklist {
   id: string;
   secao: string;

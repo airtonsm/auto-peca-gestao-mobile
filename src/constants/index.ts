@@ -98,11 +98,20 @@ export const STATUS_CORES: Record<string, { bg: string; text: string; borda?: st
   agendado: { bg: '#1E293B', text: '#94A3B8', borda: '#475569' },
   recebido: { bg: '#1E3A8A', text: '#93C5FD', borda: '#3B82F6' },
   diagnostico: { bg: '#451A03', text: '#FDBA74', borda: '#F97316' },
+  'em-diagnostico': { bg: '#451A03', text: '#FDBA74', borda: '#F97316' },
   orcamento: { bg: '#3730A3', text: '#C7D2FE', borda: '#6366F1' },
   aguardando_aprovacao: { bg: '#78350F', text: '#FDE68A', borda: '#F59E0B' },
+  'aguardando-aprovacao': { bg: '#78350F', text: '#FDE68A', borda: '#F59E0B' },
+  aguardando_peca: { bg: '#422006', text: '#FDE047', borda: '#EAB308' },
+  'aguardando-peca': { bg: '#422006', text: '#FDE047', borda: '#EAB308' },
   aprovado: { bg: '#064E3B', text: '#6EE7B7', borda: '#10B981' },
   em_execucao: { bg: '#0C4A6E', text: '#7DD3FC', borda: '#0284C7' },
+  'em-execucao': { bg: '#0C4A6E', text: '#7DD3FC', borda: '#0284C7' },
   pronto: { bg: '#14532D', text: '#86EFAC', borda: '#22C55E' },
+  reprovado: { bg: '#450A0A', text: '#FCA5A5', borda: '#EF4444' },
   entregue: { bg: '#1E293B', text: '#CBD5E1', borda: '#64748B' },
   cancelado: { bg: '#7F1D1D', text: '#FCA5A5', borda: '#EF4444' },
+  cancelada: { bg: '#7F1D1D', text: '#FCA5A5', borda: '#EF4444' },
 };
+
+export * from './transicoesOS';

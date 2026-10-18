@@ -1,40 +1,49 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, StyleProp, ViewStyle, TextStyle, DimensionValue } from 'react-native';
 import { STATUS_CORES, CORES } from '../constants';
 
 interface StatusBadgeProps {
   status: string;
   rotulo?: string;
   tamanho?: 'pequeno' | 'medio' | 'grande';
+  style?: StyleProp<ViewStyle>;
+  textStyle?: StyleProp<TextStyle>;
+  maxWidth?: DimensionValue;
 }
 
 export const StatusBadge: React.FC<StatusBadgeProps> = ({
   status,
   rotulo,
   tamanho = 'medio',
+  style,
+  textStyle,
+  maxWidth,
 }) => {
   const chave = (status || '').toLowerCase().trim();
-  const cores = STATUS_CORES[chave] || {
-    bg: CORES.superficieClara,
-    text: CORES.textoSecundario,
-    borda: CORES.borda,
-  };
+  const cores =
+    STATUS_CORES[chave] ||
+    STATUS_CORES[chave.replace(/_/g, '-')] ||
+    STATUS_CORES[chave.replace(/-/g, '_')] || {
+      bg: CORES.superficieClara,
+      text: CORES.textoSecundario,
+      borda: CORES.borda,
+    };
 
   const tamanhoEstilos = {
     pequeno: {
-      paddingHorizontal: 6,
-      paddingVertical: 2,
+      paddingHorizontal: 8,
+      paddingVertical: 2.5,
       fontSize: 10,
     },
     medio: {
-      paddingHorizontal: 10,
-      paddingVertical: 4,
-      fontSize: 12,
+      paddingHorizontal: 9,
+      paddingVertical: 3.5,
+      fontSize: 11,
     },
     grande: {
-      paddingHorizontal: 14,
-      paddingVertical: 6,
-      fontSize: 14,
+      paddingHorizontal: 12,
+      paddingVertical: 5,
+      fontSize: 13,
     },
   }[tamanho];
 
@@ -48,6 +57,8 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
           paddingHorizontal: tamanhoEstilos.paddingHorizontal,
           paddingVertical: tamanhoEstilos.paddingVertical,
         },
+        maxWidth ? { maxWidth } : null,
+        style,
       ]}
     >
       <Text
@@ -57,8 +68,10 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
             color: cores.text,
             fontSize: tamanhoEstilos.fontSize,
           },
+          textStyle,
         ]}
         numberOfLines={1}
+        ellipsizeMode="tail"
       >
         {rotulo || status}
       </Text>
@@ -73,10 +86,12 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 1,
+    maxWidth: '100%',
   },
   texto: {
     fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.2,
+    flexShrink: 1,
   },
 });

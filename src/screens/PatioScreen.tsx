@@ -25,13 +25,22 @@ import { StatusBadge } from '../components/StatusBadge';
 import { ChecklistDetalhesModal } from '../components/ChecklistDetalhesModal';
 import { ModalPecasOS } from '../components/ModalPecasOS';
 import { ModalEnviarWhatsAppChecklist } from '../components/ModalEnviarWhatsAppChecklist';
+import { ModalMudarStatusOS } from '../components/ModalMudarStatusOS';
+import {
+  normalizarChaveStatus,
+  obterProximoPassoRecomendado,
+  obterInfoStatus,
+} from '../constants/transicoesOS';
 import { useAuth } from '../context/AuthContext';
 
 const FILTROS_STATUS = [
   { chave: 'todos', rotulo: 'Todas' },
   { chave: 'recebido', rotulo: 'Recebido' },
-  { chave: 'diagnostico', rotulo: 'Diagnóstico' },
-  { chave: 'em_execucao', rotulo: 'Em Execução' },
+  { chave: 'em-diagnostico', rotulo: 'Diagnóstico' },
+  { chave: 'aguardando-aprovacao', rotulo: 'Aprovação' },
+  { chave: 'aprovado', rotulo: 'Aprovado' },
+  { chave: 'em-execucao', rotulo: 'Em Execução' },
+  { chave: 'aguardando-peca', rotulo: 'Aguard. Peça' },
   { chave: 'pronto', rotulo: 'Pronto' },
 ];
 
@@ -62,7 +71,47 @@ export const PatioScreen: React.FC = () => {
   const [osWhatsAppSelecionada, setOsWhatsAppSelecionada] = useState<RespostaOSResumo | null>(null);
   const [checklistWhatsAppSelecionado, setChecklistWhatsAppSelecionado] = useState<RespostaChecklist | null>(null);
 
+  // Modal de mudança de status da OS
+  const [modalStatusVisivel, setModalStatusVisivel] = useState(false);
+  const [osStatusSelecionada, setOsStatusSelecionada] = useState<RespostaOSResumo | null>(null);
+
   const { oficinaAtiva, usuario } = useAuth();
+
+  const abrirModalMudarStatus = (os: RespostaOSResumo) => {
+    setOsStatusSelecionada(os);
+    setModalStatusVisivel(true);
+  };
+
+  const handleStatusAtualizadoComSucesso = (osAtualizada: any) => {
+    if (!osStatusSelecionada?.id) return;
+    const osId = osStatusSelecionada.id;
+
+    setOrdens((prev) =>
+      prev.map((item) => {
+        if (item.id === osId) {
+          const novoStatus = osAtualizada?.status || item.status;
+          const novoStatusRotulo =
+            osAtualizada?.statusRotulo ||
+            obterInfoStatus(novoStatus).rotulo ||
+            item.statusRotulo;
+          const novaVersao =
+            typeof osAtualizada?.versao === 'number'
+              ? osAtualizada.versao
+              : item.versao + 1;
+
+          return {
+            ...item,
+            status: novoStatus,
+            statusRotulo: novoStatusRotulo,
+            versao: novaVersao,
+            aguardandoPeca:
+              normalizarChaveStatus(novoStatus) === 'aguardando-peca',
+          };
+        }
+        return item;
+      })
+    );
+  };
 
   const abrirModalPecas = (os: RespostaOSResumo) => {
     setOsPecasSelecionada(os);
@@ -136,7 +185,9 @@ export const PatioScreen: React.FC = () => {
     return ordens.filter((os) => {
       // Filtro por status
       if (filtroStatus !== 'todos') {
-        if ((os.status || '').toLowerCase() !== filtroStatus.toLowerCase()) {
+        const statusItemNorm = normalizarChaveStatus(os.status);
+        const filtroNorm = normalizarChaveStatus(filtroStatus);
+        if (statusItemNorm !== filtroNorm) {
           return false;
         }
       }
@@ -197,16 +248,28 @@ export const PatioScreen: React.FC = () => {
     const temChecklist = checklistsDaOS.length > 0;
     const temEntrada = checklistsDaOS.some((c) => c.tipo === 'entrada');
     const temSaida = checklistsDaOS.some((c) => c.tipo === 'saida');
+    const proximoPasso = obterProximoPassoRecomendado(item.status);
 
     return (
       <View style={styles.cardOS}>
-        {/* Cabeçalho do Card: Placa, Número da OS e Status */}
+        {/* Cabeçalho do Card: Placa, Número da OS e Status Clicável */}
         <View style={styles.cardHeader}>
           <View style={styles.cardHeaderEsquerda}>
             <PlacaVeiculo placa={item.placa} tamanho="pequeno" />
             <Text style={styles.numeroOSText}>OS #{item.numero}</Text>
           </View>
-          <StatusBadge status={item.status} rotulo={item.statusRotulo} />
+
+          <TouchableOpacity
+            style={styles.badgeStatusClicavel}
+            onPress={() => abrirModalMudarStatus(item)}
+            activeOpacity={0.7}
+            accessibilityLabel={`Status: ${item.statusRotulo || item.status}. Toque para alterar status.`}
+          >
+            <StatusBadge status={item.status} rotulo={item.statusRotulo} tamanho="pequeno" />
+            <View style={styles.iconeTrocaBadge}>
+              <Ionicons name="swap-horizontal" size={12} color={CORES.textoMudo} />
+            </View>
+          </TouchableOpacity>
         </View>
 
         {/* Informações do Veículo e Cliente */}
@@ -278,8 +341,34 @@ export const PatioScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* Barra de Ações: Peças e Checklists */}
+        {/* Barra de Ações: Peças, Status e Checklists */}
         <View style={styles.cardAcoesContainer}>
+          {/* Botão de Avanço Rápido para o Próximo Passo Recomendado */}
+          {proximoPasso && (
+            <TouchableOpacity
+              style={[
+                styles.botaoAvancoRapido,
+                { borderColor: `${proximoPasso.info.cor}66` },
+              ]}
+              onPress={() => abrirModalMudarStatus(item)}
+              activeOpacity={0.8}
+            >
+              <View style={styles.botaoAvancoRapidoConteudo}>
+                <Ionicons name="play" size={13} color={proximoPasso.info.cor} />
+                <Text
+                  style={[
+                    styles.botaoAvancoRapidoTexto,
+                    { color: proximoPasso.info.cor },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {proximoPasso.rotuloAcao}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={14} color={proximoPasso.info.cor} />
+            </TouchableOpacity>
+          )}
+
           <View style={styles.cardAcoesLinha}>
             {/* Botão de Peças da OS */}
             <TouchableOpacity
@@ -293,6 +382,16 @@ export const PatioScreen: React.FC = () => {
               )}
             </TouchableOpacity>
 
+            {/* Botão Mudar Status da OS */}
+            <TouchableOpacity
+              style={styles.botaoMudarStatusCard}
+              onPress={() => abrirModalMudarStatus(item)}
+              accessibilityLabel="Mudar status da Ordem de Serviço"
+            >
+              <Ionicons name="swap-horizontal" size={16} color="#A78BFA" />
+              <Text style={styles.botaoMudarStatusCardTexto}>Status</Text>
+            </TouchableOpacity>
+
             {temChecklist ? (
               <>
                 {/* Botão Principal: Mostrar Checklist */}
@@ -302,7 +401,7 @@ export const PatioScreen: React.FC = () => {
                 >
                   <Ionicons name="eye-outline" size={18} color="#FFFFFF" />
                   <Text style={styles.botaoMostrarChecklistTexto} numberOfLines={1}>
-                    Mostrar Checklist
+                    Checklist
                   </Text>
                 </TouchableOpacity>
 
@@ -323,7 +422,7 @@ export const PatioScreen: React.FC = () => {
               >
                 <Ionicons name="clipboard-outline" size={18} color="#FFFFFF" />
                 <Text style={styles.botaoFazerChecklistTexto} numberOfLines={1}>
-                  Fazer Checklist
+                  Checklist
                 </Text>
               </TouchableOpacity>
             )}
@@ -466,6 +565,18 @@ export const PatioScreen: React.FC = () => {
         checklist={checklistWhatsAppSelecionado}
         nomeOficina={oficinaAtiva?.nome || usuario?.empresa}
       />
+
+      {/* Modal de Mudança de Status da OS com Bloqueio Otimista */}
+      <ModalMudarStatusOS
+        visivel={modalStatusVisivel}
+        os={osStatusSelecionada}
+        aoFechar={() => {
+          setModalStatusVisivel(false);
+          setOsStatusSelecionada(null);
+        }}
+        aoMudarStatusSucesso={handleStatusAtualizadoComSucesso}
+        aoSolicitarRecarregar={carregarOS}
+      />
     </View>
   );
 };
@@ -578,17 +689,21 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 3,
+    overflow: 'hidden',
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
+    gap: 8,
+    flexWrap: 'wrap',
   },
   cardHeaderEsquerda: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
+    flexShrink: 0,
   },
   numeroOSText: {
     color: CORES.primariaClara,
@@ -779,5 +894,59 @@ const styles = StyleSheet.create({
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  badgeStatusClicavel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    flexShrink: 1,
+    maxWidth: '58%',
+    justifyContent: 'flex-end',
+  },
+  iconeTrocaBadge: {
+    padding: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexShrink: 0,
+  },
+  botaoMudarStatusCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 11,
+    borderRadius: 8,
+    backgroundColor: 'rgba(167, 139, 250, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(167, 139, 250, 0.35)',
+    gap: 4,
+  },
+  botaoMudarStatusCardTexto: {
+    color: '#A78BFA',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  botaoAvancoRapido: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderWidth: 1,
+    marginBottom: 4,
+  },
+  botaoAvancoRapidoConteudo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+  },
+  botaoAvancoRapidoTexto: {
+    fontSize: 12,
+    fontWeight: '700',
   },
 });
