@@ -81,6 +81,37 @@ export interface RespostaOSResumo {
   versao: number;
 }
 
+export interface RespostaItemServicoOS {
+  id: string;
+  servicoId?: string;
+  mecanicoId?: string;
+  mecanicoNome?: string;
+  descricao: string;
+  tempoPadraoHoras?: number;
+  tempoRealHoras?: number;
+  valor: number;
+  status?: string;
+  garantiaDias: number;
+  garantiaAte?: string;
+  naGarantia?: boolean;
+  ordem: number;
+}
+
+export interface RespostaOSCompleta extends RespostaOSResumo {
+  kmEntrada?: number;
+  queixaCliente?: string;
+  diagnostico?: string;
+  observacoes?: string;
+  desconto?: number;
+  formaPagamento?: string;
+  autorizacaoCartao?: string;
+  aprovadaEm?: string;
+  iniciadaEm?: string;
+  entregueEm?: string;
+  valorServicos?: number;
+  itens?: RespostaItemServicoOS[];
+}
+
 // ============================================================================
 // Tipos para Transição e Mudança de Status da OS (ControladorOrdemServico.java)
 // ============================================================================

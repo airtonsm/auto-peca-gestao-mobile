@@ -27,6 +27,7 @@ import { ModalPecasOS } from '../components/ModalPecasOS';
 import { ModalEnviarWhatsAppChecklist } from '../components/ModalEnviarWhatsAppChecklist';
 import { ModalMudarStatusOS } from '../components/ModalMudarStatusOS';
 import { ModalNovaOS } from '../components/ModalNovaOS';
+import { ModalImprimirOS } from '../components/ModalImprimirOS';
 import {
   normalizarChaveStatus,
   obterProximoPassoRecomendado,
@@ -78,6 +79,15 @@ export const PatioScreen: React.FC = () => {
 
   // Modal para abertura de Nova Ordem de Serviço
   const [modalNovaOSVisivel, setModalNovaOSVisivel] = useState(false);
+
+  // Modal para Impressão da OS e Envio pelo WhatsApp
+  const [modalImprimirOSVisivel, setModalImprimirOSVisivel] = useState(false);
+  const [osImprimirSelecionada, setOsImprimirSelecionada] = useState<RespostaOSResumo | null>(null);
+
+  const abrirModalImprimirOS = (os: RespostaOSResumo) => {
+    setOsImprimirSelecionada(os);
+    setModalImprimirOSVisivel(true);
+  };
 
   const { oficinaAtiva, usuario } = useAuth();
 
@@ -452,6 +462,25 @@ export const PatioScreen: React.FC = () => {
               </Text>
             </TouchableOpacity>
           )}
+
+          {/* Botão Dedicado: Imprimir OS / Orçamento e Enviar via WhatsApp */}
+          <TouchableOpacity
+            style={styles.botaoImprimirOSCard}
+            onPress={() => abrirModalImprimirOS(item)}
+            activeOpacity={0.8}
+            accessibilityLabel="Visualizar impressão da OS e enviar via WhatsApp"
+          >
+            <View style={styles.botaoImprimirOSConteudo}>
+              <Ionicons name="document-text-outline" size={15} color="#38BDF8" />
+              <Text style={styles.botaoImprimirOSTexto}>
+                Imprimir OS / Orçamento
+              </Text>
+            </View>
+            <View style={styles.botaoImprimirOSWhatsAppTag}>
+              <Ionicons name="logo-whatsapp" size={13} color="#25D366" />
+              <Text style={styles.botaoImprimirOSWhatsAppTagTexto}>WhatsApp</Text>
+            </View>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -641,6 +670,17 @@ export const PatioScreen: React.FC = () => {
         aoFechar={() => setModalNovaOSVisivel(false)}
         aoOSCriadaComSucesso={handleOSCriadaComSucesso}
         aoIniciarChecklistAposCriar={handleIniciarChecklistAposCriar}
+      />
+
+      {/* Modal de Impressão da OS e Envio pelo WhatsApp */}
+      <ModalImprimirOS
+        visivel={modalImprimirOSVisivel}
+        onFechar={() => {
+          setModalImprimirOSVisivel(false);
+          setOsImprimirSelecionada(null);
+        }}
+        osResumo={osImprimirSelecionada}
+        nomeOficina={oficinaAtiva?.nome || usuario?.empresa}
       />
     </View>
   );
@@ -1082,5 +1122,43 @@ const styles = StyleSheet.create({
   botaoAvancoRapidoTexto: {
     fontSize: 12,
     fontWeight: '700',
+  },
+  botaoImprimirOSCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: 'rgba(56, 189, 248, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.28)',
+    marginTop: 2,
+  },
+  botaoImprimirOSConteudo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  botaoImprimirOSTexto: {
+    color: '#38BDF8',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  botaoImprimirOSWhatsAppTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(37, 211, 102, 0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(37, 211, 102, 0.3)',
+  },
+  botaoImprimirOSWhatsAppTagTexto: {
+    color: '#25D366',
+    fontSize: 11,
+    fontWeight: '800',
   },
 });

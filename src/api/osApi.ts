@@ -1,6 +1,7 @@
 import { clienteHttp } from './clienteHttp';
 import {
   RespostaOSResumo,
+  RespostaOSCompleta,
   PedidoTransicaoStatusOS,
   PedidoCriarOS,
   RespostaVeiculo,
@@ -28,8 +29,8 @@ export const osApi = {
   /**
    * Obtém os detalhes completos de uma Ordem de Serviço pelo ID.
    */
-  async obterPorId(id: string): Promise<any> {
-    const response = await clienteHttp.get(`/api/os/${id}`);
+  async obterPorId(id: string): Promise<RespostaOSCompleta> {
+    const response = await clienteHttp.get<RespostaOSCompleta>(`/api/os/${id}`);
     return response.data;
   },
 
