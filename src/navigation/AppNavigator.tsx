@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -18,10 +18,25 @@ import { PerfilScreen } from '../screens/PerfilScreen';
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
+const HeaderOficinaComLogo: React.FC = () => {
+  const { oficinaAtiva, usuario } = useAuth();
+  const nomeOficina = oficinaAtiva?.nome || usuario?.empresa || 'Minha Oficina';
+
+  return (
+    <View style={styles.headerOficinaContainer}>
+      <AutoFLogo tamanho="mini" mostrarTexto={false} orientacao="horizontal" />
+      <Text style={styles.headerOficinaTexto} numberOfLines={1} ellipsizeMode="tail">
+        {nomeOficina}
+      </Text>
+    </View>
+  );
+};
+
 const AbasPrincipais = () => {
   return (
     <Tab.Navigator
       screenOptions={{
+        headerTitleAlign: 'left',
         headerStyle: {
           backgroundColor: CORES.superficie,
         },
@@ -50,7 +65,7 @@ const AbasPrincipais = () => {
         name="Patio"
         component={PatioScreen}
         options={{
-          title: 'Pátio & Veículos',
+          headerTitle: () => <HeaderOficinaComLogo />,
           tabBarLabel: 'Pátio (OS)',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="car-sport" size={size} color={color} />
@@ -133,5 +148,18 @@ const styles = StyleSheet.create({
   },
   loadingSpinner: {
     marginTop: 28,
+  },
+  headerOficinaContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingRight: 16,
+  },
+  headerOficinaTexto: {
+    color: CORES.texto,
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+    flexShrink: 1,
   },
 });

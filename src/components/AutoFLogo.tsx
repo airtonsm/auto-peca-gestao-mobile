@@ -2,28 +2,32 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 
 interface AutoFLogoProps {
-  tamanho?: 'pequeno' | 'medio' | 'grande';
+  tamanho?: 'mini' | 'pequeno' | 'medio' | 'grande';
   mostrarSubtitulo?: boolean;
+  mostrarTexto?: boolean;
   orientacao?: 'vertical' | 'horizontal';
 }
 
 export const AutoFLogo: React.FC<AutoFLogoProps> = ({
   tamanho = 'grande',
   mostrarSubtitulo = true,
+  mostrarTexto = true,
   orientacao = 'vertical',
 }) => {
   const isGrande = tamanho === 'grande';
   const isMedio = tamanho === 'medio';
+  const isPequeno = tamanho === 'pequeno';
+  const isMini = tamanho === 'mini';
 
-  const dimensaoSimbolo = isGrande ? 74 : isMedio ? 56 : 42;
-  const raioBorda = isGrande ? 18 : isMedio ? 14 : 10;
-  const tamanhoFonteA = isGrande ? 44 : isMedio ? 32 : 24;
-  const barraAmarelaTop = isGrande ? 25 : isMedio ? 18.5 : 14;
-  const barraAmarelaLargura = isGrande ? 22 : isMedio ? 16 : 12;
-  const barraAmarelaAltura = isGrande ? 4.5 : isMedio ? 3.5 : 2.5;
+  const dimensaoSimbolo = isGrande ? 74 : isMedio ? 56 : isPequeno ? 42 : 30;
+  const raioBorda = isGrande ? 18 : isMedio ? 14 : isPequeno ? 10 : 7;
+  const tamanhoFonteA = isGrande ? 44 : isMedio ? 32 : isPequeno ? 24 : 17;
+  const barraAmarelaTop = isGrande ? 25 : isMedio ? 18.5 : isPequeno ? 14 : 9.5;
+  const barraAmarelaLargura = isGrande ? 22 : isMedio ? 16 : isPequeno ? 12 : 9;
+  const barraAmarelaAltura = isGrande ? 4.5 : isMedio ? 3.5 : isPequeno ? 2.5 : 2;
 
-  const tamanhoFonteTexto = isGrande ? 28 : isMedio ? 22 : 17;
-  const tamanhoFonteSubtitulo = isGrande ? 13 : isMedio ? 11 : 9.5;
+  const tamanhoFonteTexto = isGrande ? 28 : isMedio ? 22 : isPequeno ? 17 : 14;
+  const tamanhoFonteSubtitulo = isGrande ? 13 : isMedio ? 11 : isPequeno ? 9.5 : 8;
 
   return (
     <View
@@ -40,6 +44,8 @@ export const AutoFLogo: React.FC<AutoFLogoProps> = ({
             width: dimensaoSimbolo,
             height: dimensaoSimbolo,
             borderRadius: raioBorda,
+            elevation: isMini ? 3 : 8,
+            shadowRadius: isMini ? 4 : 10,
           },
         ]}
       >
@@ -70,23 +76,25 @@ export const AutoFLogo: React.FC<AutoFLogoProps> = ({
       </View>
 
       {/* Tipografia da Marca */}
-      <View
-        style={[
-          styles.textosContainer,
-          orientacao === 'horizontal' && styles.textosContainerHorizontal,
-        ]}
-      >
-        <View style={styles.linhaNome}>
-          <Text style={[styles.textoAuto, { fontSize: tamanhoFonteTexto }]}>Auto</Text>
-          <Text style={[styles.textoF, { fontSize: tamanhoFonteTexto }]}>F</Text>
-        </View>
+      {mostrarTexto && (
+        <View
+          style={[
+            styles.textosContainer,
+            orientacao === 'horizontal' && styles.textosContainerHorizontal,
+          ]}
+        >
+          <View style={styles.linhaNome}>
+            <Text style={[styles.textoAuto, { fontSize: tamanhoFonteTexto }]}>Auto</Text>
+            <Text style={[styles.textoF, { fontSize: tamanhoFonteTexto }]}>F</Text>
+          </View>
 
-        {mostrarSubtitulo && (
-          <Text style={[styles.subtitulo, { fontSize: tamanhoFonteSubtitulo }]}>
-            Sistema de Gestão
-          </Text>
-        )}
-      </View>
+          {mostrarSubtitulo && (
+            <Text style={[styles.subtitulo, { fontSize: tamanhoFonteSubtitulo }]}>
+              Sistema de Gestão
+            </Text>
+          )}
+        </View>
+      )}
     </View>
   );
 };

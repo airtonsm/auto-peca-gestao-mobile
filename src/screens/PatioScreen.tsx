@@ -464,7 +464,7 @@ export const PatioScreen: React.FC = () => {
       <View style={styles.topoSecao}>
         <View style={styles.cabecalhoAcoesPatio}>
           <View style={styles.cabecalhoTituloCol}>
-            <Text style={styles.cabecalhoTituloTexto}>Pátio de Veículos</Text>
+            <Text style={styles.cabecalhoTituloTexto}>Ordens de Serviço</Text>
             <Text style={styles.cabecalhoContadorTexto}>
               {ordens.length} {ordens.length === 1 ? 'OS aberta' : 'OSs abertas'}
             </Text>
