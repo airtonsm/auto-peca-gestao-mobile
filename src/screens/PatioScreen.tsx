@@ -407,15 +407,14 @@ export const PatioScreen: React.FC = () => {
 
             {temChecklist ? (
               <>
-                {/* Botão Principal: Mostrar Checklist */}
+                {/* Botão Principal: Mostrar Checklist (Apenas ícone de olho) */}
                 <TouchableOpacity
                   style={styles.botaoMostrarChecklist}
                   onPress={() => abrirDetalhesChecklist(item)}
+                  accessibilityLabel="Ver Checklist preenchido"
+                  activeOpacity={0.8}
                 >
-                  <Ionicons name="eye-outline" size={18} color="#FFFFFF" />
-                  <Text style={styles.botaoMostrarChecklistTexto} numberOfLines={1}>
-                    Checklist
-                  </Text>
+                  <Ionicons name="eye-outline" size={20} color="#FFFFFF" />
                 </TouchableOpacity>
 
                 {/* Botão Atalho WhatsApp */}
@@ -965,12 +964,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 8,
     backgroundColor: '#2563EB',
-    gap: 6,
-  },
-  botaoMostrarChecklistTexto: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '800',
+    minHeight: 40,
   },
   botaoFazerSaidaDedicado: {
     flexDirection: 'row',
