@@ -32,6 +32,7 @@ interface AuthContextData {
     mensagem?: string;
   }>;
   selecionarOficinaNoLogin: (oficinaId: string) => Promise<{ sucesso: boolean; mensagem?: string }>;
+  cancelarEscolhaOficina: () => void;
   trocarOficina: (oficinaId: string) => Promise<boolean>;
   logout: () => Promise<void>;
   atualizarServidorUrl: (novaUrl: string) => Promise<void>;
@@ -126,15 +127,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (resposta.tokenAcesso) {
+        setCredenciaisTemporarias(null);
         await processarLoginSucesso(resposta);
         return { sucesso: true };
       }
 
+      setCredenciaisTemporarias(null);
       return {
         sucesso: false,
         mensagem: 'Não foi possível concluir a autenticação. Verifique suas credenciais.',
       };
     } catch (error) {
+      setCredenciaisTemporarias(null);
       return {
         sucesso: false,
         mensagem: extrairMensagemErro(error),
@@ -142,10 +146,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const cancelarEscolhaOficina = () => {
+    setPrecisaEscolherOficina(false);
+    setCredenciaisTemporarias(null);
+  };
+
   const selecionarOficinaNoLogin = async (
     oficinaId: string
   ): Promise<{ sucesso: boolean; mensagem?: string }> => {
     if (!credenciaisTemporarias) {
+      setPrecisaEscolherOficina(false);
       return {
         sucesso: false,
         mensagem: 'Sessão expirada. Digite seu e-mail e senha novamente.',
@@ -267,6 +277,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         precisaEscolherOficina,
         login,
         selecionarOficinaNoLogin,
+        cancelarEscolhaOficina,
         trocarOficina,
         logout,
         atualizarServidorUrl,

@@ -26,11 +26,12 @@ export const LoginScreen: React.FC = () => {
     oficinasDisponiveis,
     precisaEscolherOficina,
     selecionarOficinaNoLogin,
+    cancelarEscolhaOficina,
     servidorUrl,
   } = useAuth();
 
-  const [email, setEmail] = useState('airton@aftecnologia.com.br');
-  const [senha, setSenha] = useState('oficina@2026');
+  const [email, setEmail] = useState('');
+  const [senha, setSenha] = useState('');
   const [ocultarSenha, setOcultarSenha] = useState(true);
   const [carregando, setCarregando] = useState(false);
   const [mensagemErro, setMensagemErro] = useState<string | null>(null);
@@ -179,6 +180,7 @@ export const LoginScreen: React.FC = () => {
         visible={precisaEscolherOficina}
         animationType="slide"
         transparent
+        onRequestClose={cancelarEscolhaOficina}
       >
         <View style={styles.fundoModal}>
           <View style={styles.cardEscolhaOficina}>
@@ -215,6 +217,16 @@ export const LoginScreen: React.FC = () => {
                 <Text style={styles.carregandoOficinaTexto}>Carregando ambiente da oficina...</Text>
               </View>
             )}
+
+            {/* Botão Cancelar para limpar credenciais transitórias */}
+            <TouchableOpacity
+              style={styles.botaoCancelarEscolhaOficina}
+              onPress={cancelarEscolhaOficina}
+              disabled={carregando}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.botaoCancelarEscolhaOficinaTexto}>Cancelar e Voltar</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -463,5 +475,20 @@ const styles = StyleSheet.create({
   carregandoOficinaTexto: {
     color: CORES.textoSecundario,
     fontSize: 13,
+  },
+  botaoCancelarEscolhaOficina: {
+    marginTop: 14,
+    paddingVertical: 12,
+    borderRadius: 10,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: CORES.borda,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  botaoCancelarEscolhaOficinaTexto: {
+    color: CORES.textoSecundario,
+    fontSize: 14,
+    fontWeight: '700',
   },
 });

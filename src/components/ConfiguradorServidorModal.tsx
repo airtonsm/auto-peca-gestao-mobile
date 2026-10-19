@@ -19,6 +19,50 @@ interface ConfiguradorServidorModalProps {
   aoFechar: () => void;
 }
 
+interface ResultadoValidacaoUrl {
+  valida: boolean;
+  erro?: string;
+  avisoSeguranca?: string;
+  urlNormalizada: string;
+}
+
+const validarUrlServidor = (urlBruta: string): ResultadoValidacaoUrl => {
+  let limpa = urlBruta.trim();
+  if (!limpa) {
+    return { valida: false, erro: 'O endereço do servidor não pode estar vazio.', urlNormalizada: '' };
+  }
+
+  // Bloqueia esquemas perigosos (javascript:, data:, file:, etc.)
+  if (/^(javascript|data|file|ftp):/i.test(limpa)) {
+    return { valida: false, erro: 'Protocolo não permitido. Utilize http:// ou https://.', urlNormalizada: '' };
+  }
+
+  if (!/^https?:\/\//i.test(limpa)) {
+    limpa = `http://${limpa}`;
+  }
+
+  try {
+    const parsed = new URL(limpa);
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      return { valida: false, erro: 'Protocolo inválido. Utilize http:// ou https://.', urlNormalizada: '' };
+    }
+
+    const host = parsed.hostname.toLowerCase();
+    const isLocalhost = host === 'localhost' || host === '127.0.0.1' || host === '10.0.2.2';
+    const isPrivateIp = /^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)/.test(host);
+
+    let avisoSeguranca: string | undefined;
+    if (parsed.protocol === 'http:' && !isLocalhost && !isPrivateIp) {
+      avisoSeguranca = 'Você está configurando um domínio público sem criptografia (HTTP). Para ambientes de produção com dados de clientes, o uso de HTTPS é fortemente recomendado para evitar interceptação de dados.';
+    }
+
+    const normalizada = `${parsed.protocol}//${parsed.host}${parsed.pathname === '/' ? '' : parsed.pathname}`.replace(/\/+$/, '');
+    return { valida: true, avisoSeguranca, urlNormalizada: normalizada };
+  } catch {
+    return { valida: false, erro: 'Formato de URL inválido. Exemplo: http://192.168.1.10:8080 ou https://minhaoficina.com.br', urlNormalizada: '' };
+  }
+};
+
 export const ConfiguradorServidorModal: React.FC<ConfiguradorServidorModalProps> = ({
   visivel,
   aoFechar,
@@ -32,11 +76,16 @@ export const ConfiguradorServidorModal: React.FC<ConfiguradorServidorModalProps>
   } | null>(null);
 
   const testarConexao = async (urlParaTestar: string) => {
-    let urlLimpa = urlParaTestar.trim();
-    if (urlLimpa.endsWith('/')) {
-      urlLimpa = urlLimpa.slice(0, -1);
+    const validacao = validarUrlServidor(urlParaTestar);
+    if (!validacao.valida) {
+      setResultadoTeste({
+        sucesso: false,
+        mensagem: validacao.erro || 'Endereço inválido.',
+      });
+      return;
     }
 
+    const urlLimpa = validacao.urlNormalizada;
     setTestando(true);
     setResultadoTeste(null);
     try {
@@ -63,12 +112,32 @@ export const ConfiguradorServidorModal: React.FC<ConfiguradorServidorModalProps>
   };
 
   const handleSalvar = async () => {
-    let urlLimpa = urlDigitada.trim();
-    if (!urlLimpa.startsWith('http://') && !urlLimpa.startsWith('https://')) {
-      urlLimpa = `http://${urlLimpa}`;
+    const validacao = validarUrlServidor(urlDigitada);
+    if (!validacao.valida) {
+      Alert.alert('Endereço Inválido', validacao.erro || 'Verifique o endereço digitado.');
+      return;
     }
-    if (urlLimpa.endsWith('/')) {
-      urlLimpa = urlLimpa.slice(0, -1);
+
+    const urlLimpa = validacao.urlNormalizada;
+
+    if (validacao.avisoSeguranca) {
+      Alert.alert(
+        'Alerta de Segurança (HTTP)',
+        `${validacao.avisoSeguranca}\n\nDeseja prosseguir mesmo assim?`,
+        [
+          { text: 'Voltar e Corrigir', style: 'cancel' },
+          {
+            text: 'Confirmar e Usar HTTP',
+            style: 'destructive',
+            onPress: async () => {
+              await atualizarServidorUrl(urlLimpa);
+              Alert.alert('Configuração Salva', `Endereço da API atualizado para:\n${urlLimpa}`);
+              aoFechar();
+            },
+          },
+        ]
+      );
+      return;
     }
 
     await atualizarServidorUrl(urlLimpa);
