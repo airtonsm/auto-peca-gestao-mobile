@@ -83,7 +83,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               }
             }
           } catch (e) {
-            console.warn('Token existente inválido ou expirado:', e);
+            console.log('[Auth] Token existente inválido ou expirado, limpando sessão:', e);
             await logout();
           }
         }
