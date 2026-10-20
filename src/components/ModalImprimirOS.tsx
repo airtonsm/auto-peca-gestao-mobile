@@ -311,14 +311,15 @@ export const ModalImprimirOS: React.FC<ModalImprimirOSProps> = ({
           </TouchableOpacity>
         </View>
 
-        {/* Abas Superiores: Alternar entre 'Visualizar Documento' e 'Enviar WhatsApp' */}
+        {/* Abas Superiores: Alternar entre 'Visualizar Folha' e 'Enviar WhatsApp' */}
         <View style={styles.abasNavegacao}>
           <TouchableOpacity
             style={[styles.abaItem, abaAtiva === 'documento' && styles.abaItemAtiva]}
             onPress={() => setAbaAtiva('documento')}
+            activeOpacity={0.8}
           >
             <Ionicons
-              name="eye-outline"
+              name="document-text-outline"
               size={18}
               color={abaAtiva === 'documento' ? '#FFFFFF' : CORES.textoMudo}
             />
@@ -328,13 +329,14 @@ export const ModalImprimirOS: React.FC<ModalImprimirOSProps> = ({
                 abaAtiva === 'documento' && styles.abaItemTextoAtivo,
               ]}
             >
-              Documento Impresso
+              Visualizar Folha
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.abaItem, abaAtiva === 'whatsapp' && styles.abaItemAtivaWhatsApp]}
             onPress={() => setAbaAtiva('whatsapp')}
+            activeOpacity={0.8}
           >
             <Ionicons
               name="logo-whatsapp"
