@@ -399,3 +399,48 @@ export interface PedidoCriarOS {
   status: 'recebido' | 'agendado';
   confirmarKmMenor?: boolean;
 }
+
+// ============================================================================
+// Tipos para Gestão e Cadastro de Usuários da Oficina (ControladorUsuario.java)
+// ============================================================================
+
+export interface OpcaoUsuario {
+  chave: string;
+  rotulo: string;
+  descricao?: string;
+}
+
+export interface OpcoesDeUsuario {
+  papeis: OpcaoUsuario[];
+  permissoes: OpcaoUsuario[];
+}
+
+export interface PedidoUsuario {
+  nome: string;
+  email: string;
+  telefone?: string;
+  papel: string;
+  permissoesExtras?: string[];
+  permissoesRemovidas?: string[];
+  ativo?: boolean;
+  mecanicoId?: string | null;
+}
+
+export interface RespostaUsuario {
+  id: string;
+  nome: string;
+  email: string;
+  telefone?: string;
+  papel: string;
+  papelRotulo: string;
+  permissoesExtras?: string[];
+  permissoesRemovidas?: string[];
+  permissoesEfetivas?: string[];
+  ativo: boolean;
+  ultimoAcessoEm?: string;
+  deveTrocarSenha?: boolean;
+  mecanicoId?: string | null;
+  criadoEm?: string;
+  senhaInicial?: string;
+}
+

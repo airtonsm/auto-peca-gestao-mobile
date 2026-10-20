@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -14,7 +14,9 @@ import { useAuth } from '../context/AuthContext';
 import { CORES } from '../constants';
 import { extrairMensagemErro } from '../api/clienteHttp';
 import { ConfiguradorServidorModal } from '../components/ConfiguradorServidorModal';
+import { ModalGerenciarUsuarios } from '../components/ModalGerenciarUsuarios';
 import { authApi } from '../api/authApi';
+import { usuarioApi } from '../api/usuarioApi';
 
 export const PerfilScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -29,7 +31,45 @@ export const PerfilScreen: React.FC = () => {
 
   const [trocandoOficina, setTrocandoOficina] = useState<string | null>(null);
   const [modalServidorVisivel, setModalServidorVisivel] = useState(false);
+  const [modalUsuariosVisivel, setModalUsuariosVisivel] = useState(false);
   const [testandoSaude, setTestandoSaude] = useState(false);
+  const [contagemEquipe, setContagemEquipe] = useState<{
+    total: number;
+    ativos: number;
+  } | null>(null);
+  const [carregandoEquipe, setCarregandoEquipe] = useState(false);
+
+  const podeVerUsuarios = useMemo(() => {
+    if (!usuario) return false;
+    const permissoes = usuario.permissoes || [];
+    const papel = (usuario.papel || '').toLowerCase();
+    return (
+      permissoes.includes('usuario.ver') ||
+      papel === 'administrador' ||
+      papel === 'gestor'
+    );
+  }, [usuario]);
+
+  const carregarContagemEquipe = useCallback(async () => {
+    if (!podeVerUsuarios) {
+      setContagemEquipe(null);
+      return;
+    }
+    setCarregandoEquipe(true);
+    try {
+      const lista = await usuarioApi.listarUsuarios();
+      const ativos = lista.filter((u) => u.ativo).length;
+      setContagemEquipe({ total: lista.length, ativos });
+    } catch {
+      // Falha silenciosa no resumo do card
+    } finally {
+      setCarregandoEquipe(false);
+    }
+  }, [podeVerUsuarios, oficinaAtiva?.id]);
+
+  useEffect(() => {
+    carregarContagemEquipe();
+  }, [carregarContagemEquipe]);
 
   const handleTrocarOficina = async (oficinaId: string, nomeOficina: string) => {
     if (oficinaId === oficinaAtiva?.id) return;
@@ -188,6 +228,66 @@ export const PerfilScreen: React.FC = () => {
           )}
         </View>
 
+        {/* Seção Equipe & Colaboradores da Oficina */}
+        {podeVerUsuarios && (
+          <View style={styles.secao}>
+            <View style={styles.secaoTituloLinha}>
+              <Ionicons name="people-outline" size={20} color={CORES.primariaClara} />
+              <Text style={styles.secaoTitulo}>Equipe & Colaboradores da Oficina</Text>
+            </View>
+
+            <View style={styles.equipeCardInterno}>
+              <View style={styles.equipeResumoLinha}>
+                <View style={styles.equipeIconeDestaque}>
+                  <Ionicons name="shield-checkmark-outline" size={24} color={CORES.primariaClara} />
+                </View>
+
+                <View style={styles.equipeTextosCol}>
+                  <View style={styles.equipeContagemRow}>
+                    {carregandoEquipe ? (
+                      <ActivityIndicator size="small" color={CORES.primariaClara} />
+                    ) : (
+                      <>
+                        <Text style={styles.equipeContagemNumero}>
+                          {contagemEquipe ? contagemEquipe.total : '—'}
+                        </Text>
+                        <Text style={styles.equipeContagemLabel}>
+                          {contagemEquipe?.total === 1
+                            ? 'membro vinculado'
+                            : 'membros vinculados'}
+                        </Text>
+                        {contagemEquipe && (
+                          <View style={styles.equipeAtivosBadge}>
+                            <Text style={styles.equipeAtivosBadgeTexto}>
+                              {contagemEquipe.ativos} {contagemEquipe.ativos === 1 ? 'ativo' : 'ativos'}
+                            </Text>
+                          </View>
+                        )}
+                      </>
+                    )}
+                  </View>
+
+                  <Text style={styles.equipeDescricao}>
+                    Gerencie cadastros, papéis de acesso, senhas iniciais e status dos colaboradores desta oficina.
+                  </Text>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={styles.botaoGerenciarEquipe}
+                onPress={() => setModalUsuariosVisivel(true)}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="people" size={18} color="#FFFFFF" />
+                <Text style={styles.botaoGerenciarEquipeTexto}>
+                  Gerenciar Equipe e Acessos
+                </Text>
+                <Ionicons name="chevron-forward" size={16} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
         {/* Seção Conexão de Rede & API */}
         <View style={styles.secao}>
           <View style={styles.secaoTituloLinha}>
@@ -245,6 +345,17 @@ export const PerfilScreen: React.FC = () => {
         visivel={modalServidorVisivel}
         aoFechar={() => setModalServidorVisivel(false)}
       />
+
+      {/* Modal Gestão de Usuários da Oficina */}
+      {podeVerUsuarios && (
+        <ModalGerenciarUsuarios
+          visivel={modalUsuariosVisivel}
+          aoFechar={() => setModalUsuariosVisivel(false)}
+          aoAtualizarContagem={(total, ativos) =>
+            setContagemEquipe({ total, ativos })
+          }
+        />
+      )}
     </View>
   );
 };
@@ -414,6 +525,85 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 16,
     flex: 1,
+  },
+  equipeCardInterno: {
+    backgroundColor: CORES.fundo,
+    borderRadius: 10,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: CORES.bordaSuave,
+    gap: 14,
+  },
+  equipeResumoLinha: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  equipeIconeDestaque: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#1E3A8A',
+    borderWidth: 1,
+    borderColor: CORES.primaria,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  equipeTextosCol: {
+    flex: 1,
+    gap: 4,
+  },
+  equipeContagemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  equipeContagemNumero: {
+    color: CORES.texto,
+    fontSize: 19,
+    fontWeight: '900',
+  },
+  equipeContagemLabel: {
+    color: CORES.textoSecundario,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  equipeAtivosBadge: {
+    backgroundColor: CORES.sucessoFundo,
+    borderWidth: 1,
+    borderColor: CORES.sucesso,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 999,
+  },
+  equipeAtivosBadgeTexto: {
+    color: CORES.sucessoTexto,
+    fontSize: 10,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  equipeDescricao: {
+    color: CORES.textoMudo,
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  botaoGerenciarEquipe: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: CORES.primaria,
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    gap: 8,
+  },
+  botaoGerenciarEquipeTexto: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
+    flex: 1,
+    textAlign: 'center',
   },
   servidorInfoCard: {
     backgroundColor: CORES.fundo,
