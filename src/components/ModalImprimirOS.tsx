@@ -209,31 +209,28 @@ export const ModalImprimirOS: React.FC<ModalImprimirOSProps> = ({
         nomeOficina,
       });
 
-      // 1. Gera o PDF temporário a partir do HTML
-      const { uri: tempUri } = await Print.printToFileAsync({ html });
+      // 1. Gera o PDF em memória com codificação base64
+      const printResult = await Print.printToFileAsync({ html, base64: true });
 
       // 2. Normaliza o nome do arquivo para um nome limpo e profissional
       const placaLimpa = (osCompleta.placa || '').replace(/[^a-zA-Z0-9]/g, '');
       const prefixo = versao === 'orcamento' ? 'Orcamento' : 'OS';
       const nomeArquivo = `${prefixo}_${osCompleta.numero}${placaLimpa ? '_' + placaLimpa : ''}.pdf`;
 
-      // 3. Copia para o cacheDirectory onde o FileProvider do Android possui permissão de leitura
+      // 3. Escreve diretamente no cacheDirectory usando base64 (eliminando problemas de copyAsync cross-sandbox)
       const diretorioBase = FileSystem.cacheDirectory || FileSystem.documentDirectory || '';
       const destinoFinal = `${diretorioBase}${nomeArquivo}`;
 
-      try {
-        const info = await FileSystem.getInfoAsync(destinoFinal);
-        if (info.exists) {
-          await FileSystem.deleteAsync(destinoFinal, { idempotent: true });
-        }
-      } catch {
-        // Ignora se não existir previamente
+      if (printResult.base64) {
+        await FileSystem.writeAsStringAsync(destinoFinal, printResult.base64, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+      } else if (printResult.uri) {
+        await FileSystem.copyAsync({
+          from: printResult.uri,
+          to: destinoFinal,
+        });
       }
-
-      await FileSystem.copyAsync({
-        from: tempUri,
-        to: destinoFinal,
-      });
 
       // 4. Compartilha o PDF no diretório autorizado
       if (await Sharing.isAvailableAsync()) {
@@ -458,25 +455,27 @@ export const ModalImprimirOS: React.FC<ModalImprimirOSProps> = ({
                 contentContainerStyle={[styles.conteudoScrollInner, { paddingBottom: insets.bottom + 100 }]}
                 showsVerticalScrollIndicator={false}
               >
-                {/* Seletor de Versão (Orçamento vs Ordem de Serviço) e Ações de PDF */}
-                <View style={styles.seletorVersaoContainer}>
-                  <View style={styles.seletorVersaoBotoes}>
+                {/* 1. Seletor de Tipo de Documento (Segmented Control Elegante) */}
+                <View style={styles.seletorTipoCard}>
+                  <Text style={styles.seletorTipoRotulo}>Versão do Documento:</Text>
+                  <View style={styles.seletorTipoLinha}>
                     <TouchableOpacity
                       style={[
-                        styles.botaoVersao,
-                        versao === 'orcamento' && styles.botaoVersaoAtivo,
+                        styles.botaoTipoDoc,
+                        versao === 'orcamento' && styles.botaoTipoDocAtivo,
                       ]}
                       onPress={() => handleTrocarVersao('orcamento')}
+                      activeOpacity={0.8}
                     >
                       <Ionicons
                         name="calculator-outline"
-                        size={15}
+                        size={16}
                         color={versao === 'orcamento' ? '#FFFFFF' : CORES.textoSecundario}
                       />
                       <Text
                         style={[
-                          styles.botaoVersaoTexto,
-                          versao === 'orcamento' && styles.botaoVersaoTextoAtivo,
+                          styles.botaoTipoDocTexto,
+                          versao === 'orcamento' && styles.botaoTipoDocTextoAtivo,
                         ]}
                       >
                         Orçamento
@@ -485,54 +484,57 @@ export const ModalImprimirOS: React.FC<ModalImprimirOSProps> = ({
 
                     <TouchableOpacity
                       style={[
-                        styles.botaoVersao,
-                        versao === 'os' && styles.botaoVersaoAtivo,
+                        styles.botaoTipoDoc,
+                        versao === 'os' && styles.botaoTipoDocAtivo,
                       ]}
                       onPress={() => handleTrocarVersao('os')}
+                      activeOpacity={0.8}
                     >
                       <Ionicons
                         name="construct-outline"
-                        size={15}
+                        size={16}
                         color={versao === 'os' ? '#FFFFFF' : CORES.textoSecundario}
                       />
                       <Text
                         style={[
-                          styles.botaoVersaoTexto,
-                          versao === 'os' && styles.botaoVersaoTextoAtivo,
+                          styles.botaoTipoDocTexto,
+                          versao === 'os' && styles.botaoTipoDocTextoAtivo,
                         ]}
                       >
                         Ordem de Serviço
                       </Text>
                     </TouchableOpacity>
                   </View>
+                </View>
 
-                  {/* Ações Rápidas: Imprimir e PDF */}
-                  <View style={styles.acoesRapidasDoc}>
-                    <TouchableOpacity
-                      style={styles.botaoAcaoDocRapida}
-                      onPress={handleImprimirNativo}
-                      accessibilityLabel="Imprimir documento"
-                    >
-                      <Ionicons name="print-outline" size={16} color="#38BDF8" />
-                      <Text style={styles.botaoAcaoDocRapidaTexto}>Imprimir</Text>
-                    </TouchableOpacity>
+                {/* 2. Barra de Ações Rápidas: Imprimir e Compartilhar PDF */}
+                <View style={styles.barraAcoesFolha}>
+                  <TouchableOpacity
+                    style={styles.botaoAcaoFolhaImprimir}
+                    onPress={handleImprimirNativo}
+                    activeOpacity={0.8}
+                    accessibilityLabel="Imprimir documento em impressora"
+                  >
+                    <Ionicons name="print-outline" size={17} color="#38BDF8" />
+                    <Text style={styles.botaoAcaoFolhaImprimirTexto}>Imprimir</Text>
+                  </TouchableOpacity>
 
-                    <TouchableOpacity
-                      style={[styles.botaoAcaoDocRapida, styles.botaoAcaoDocRapidaPDF]}
-                      onPress={handleCompartilharPDF}
-                      disabled={gerandoPDF}
-                      accessibilityLabel="Gerar e compartilhar PDF"
-                    >
-                      {gerandoPDF ? (
-                        <ActivityIndicator size="small" color="#FFFFFF" />
-                      ) : (
-                        <>
-                          <Ionicons name="document-text" size={16} color="#FFFFFF" />
-                          <Text style={[styles.botaoAcaoDocRapidaTexto, { color: '#FFFFFF' }]}>PDF</Text>
-                        </>
-                      )}
-                    </TouchableOpacity>
-                  </View>
+                  <TouchableOpacity
+                    style={styles.botaoAcaoFolhaPDF}
+                    onPress={handleCompartilharPDF}
+                    disabled={gerandoPDF}
+                    activeOpacity={0.8}
+                    accessibilityLabel="Gerar arquivo PDF e compartilhar"
+                  >
+                    {gerandoPDF ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <>
+                        <Ionicons name="document-text" size={17} color="#FFFFFF" />
+                        <Text style={styles.botaoAcaoFolhaPDFTexto}>Compartilhar PDF</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
                 </View>
 
                 {/* Folha do Documento (Visual idêntico à impressão do sistema) */}
@@ -877,36 +879,41 @@ export const ModalImprimirOS: React.FC<ModalImprimirOSProps> = ({
             )}
 
             {/* Barra Inferior Fixa com Botão de Ação Imediata */}
-            <View style={[styles.barraInferiorAcoes, { paddingBottom: Math.max(insets.bottom, 14) }]}>
+            <View style={[styles.barraInferiorAcoes, { paddingBottom: Math.max(insets.bottom, 12) }]}>
               {abaAtiva === 'documento' ? (
-                <View style={styles.botoesInferiorDocLinha}>
+                <View style={styles.barraInferiorDocContainer}>
+                  {/* Botão Principal: Compartilhar PDF no WhatsApp */}
                   <TouchableOpacity
-                    style={styles.botaoInferiorDocSecundario}
-                    onPress={() => setAbaAtiva('whatsapp')}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons name="logo-whatsapp" size={18} color="#25D366" />
-                    <Text style={styles.botaoInferiorDocSecundarioTexto}>
-                      Enviar Texto
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.botaoInferiorDocPDF}
+                    style={styles.botaoFixoPrincipalPDF}
                     onPress={handleCompartilharPDF}
                     disabled={gerandoPDF}
-                    activeOpacity={0.8}
+                    activeOpacity={0.85}
                   >
                     {gerandoPDF ? (
-                      <ActivityIndicator size="small" color="#FFFFFF" />
+                      <View style={styles.linhaCarregandoFixo}>
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                        <Text style={styles.botaoFixoPrincipalPDFTexto}>Gerando PDF da OS...</Text>
+                      </View>
                     ) : (
-                      <>
-                        <Ionicons name="share-social-outline" size={19} color="#FFFFFF" />
-                        <Text style={styles.botaoInferiorDocPDFTexto}>
-                          Gerar PDF / Compartilhar
+                      <View style={styles.linhaConteudoBotaoFixo}>
+                        <Ionicons name="logo-whatsapp" size={20} color="#FFFFFF" />
+                        <Text style={styles.botaoFixoPrincipalPDFTexto}>
+                          Compartilhar PDF no WhatsApp
                         </Text>
-                      </>
+                      </View>
                     )}
+                  </TouchableOpacity>
+
+                  {/* Atalho para Enviar como Texto Simples */}
+                  <TouchableOpacity
+                    style={styles.botaoAlternarTextoLink}
+                    onPress={() => setAbaAtiva('whatsapp')}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="chatbubble-ellipses-outline" size={14} color={CORES.primariaClara} />
+                    <Text style={styles.botaoAlternarTextoLinkTexto}>
+                      Ou enviar como mensagem de texto
+                    </Text>
                   </TouchableOpacity>
                 </View>
               ) : (
@@ -1058,47 +1065,90 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 14,
   },
-  seletorVersaoContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  seletorTipoCard: {
     backgroundColor: CORES.superficie,
     padding: 12,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: CORES.bordaSuave,
+    gap: 8,
   },
-  seletorVersaoRotulo: {
+  seletorTipoRotulo: {
     color: CORES.textoSecundario,
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  seletorVersaoBotoes: {
+  seletorTipoLinha: {
     flexDirection: 'row',
     gap: 8,
   },
-  botaoVersao: {
+  botaoTipoDoc: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 6,
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 8,
     backgroundColor: CORES.superficieClara,
     borderWidth: 1,
     borderColor: CORES.borda,
   },
-  botaoVersaoAtivo: {
+  botaoTipoDocAtivo: {
     backgroundColor: CORES.primaria,
     borderColor: CORES.primariaClara,
   },
-  botaoVersaoTexto: {
+  botaoTipoDocTexto: {
     color: CORES.textoSecundario,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
   },
-  botaoVersaoTextoAtivo: {
+  botaoTipoDocTextoAtivo: {
     color: '#FFFFFF',
+  },
+  barraAcoesFolha: {
+    flexDirection: 'row',
+    gap: 10,
+    alignItems: 'center',
+  },
+  botaoAcaoFolhaImprimir: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: 'rgba(56, 189, 248, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.35)',
+  },
+  botaoAcaoFolhaImprimirTexto: {
+    color: '#38BDF8',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  botaoAcaoFolhaPDF: {
+    flex: 1.3,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: '#2563EB',
+    shadowColor: '#2563EB',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  botaoAcaoFolhaPDFTexto: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
   },
   folhaDocumento: {
     backgroundColor: CORES.superficie,
@@ -1496,71 +1546,46 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
   },
-  acoesRapidasDoc: {
-    flexDirection: 'row',
-    gap: 6,
-    alignItems: 'center',
-  },
-  botaoAcaoDocRapida: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingVertical: 6,
-    paddingHorizontal: 9,
-    borderRadius: 6,
-    backgroundColor: 'rgba(56, 189, 248, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(56, 189, 248, 0.3)',
-  },
-  botaoAcaoDocRapidaPDF: {
-    backgroundColor: '#2563EB',
-    borderColor: '#3B82F6',
-  },
-  botaoAcaoDocRapidaTexto: {
-    color: '#38BDF8',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  botoesInferiorDocLinha: {
-    flexDirection: 'row',
-    gap: 10,
-    alignItems: 'center',
-  },
-  botaoInferiorDocSecundario: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 14,
-    paddingHorizontal: 14,
-    borderRadius: 10,
-    backgroundColor: 'rgba(37, 211, 102, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(37, 211, 102, 0.3)',
-  },
-  botaoInferiorDocSecundarioTexto: {
-    color: '#25D366',
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  botaoInferiorDocPDF: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+  barraInferiorDocContainer: {
     gap: 8,
+  },
+  botaoFixoPrincipalPDF: {
+    backgroundColor: '#16A34A',
     paddingVertical: 14,
     borderRadius: 10,
-    backgroundColor: '#2563EB',
-    shadowColor: '#2563EB',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#16A34A',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 6,
     elevation: 4,
   },
-  botaoInferiorDocPDFTexto: {
+  linhaConteudoBotaoFixo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  linhaCarregandoFixo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  botaoFixoPrincipalPDFTexto: {
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '800',
+  },
+  botaoAlternarTextoLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 6,
+    gap: 5,
+  },
+  botaoAlternarTextoLinkTexto: {
+    color: CORES.primariaClara,
+    fontSize: 13,
+    fontWeight: '700',
   },
 });
