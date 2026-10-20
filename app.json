@@ -47,7 +47,8 @@
           "photosPermission": "O aplicativo precisa de acesso às fotos para anexar imagens de avarias do checklist."
         }
       ],
-      "expo-font"
+      "expo-font",
+      "expo-sharing"
     ]
   }
 }
