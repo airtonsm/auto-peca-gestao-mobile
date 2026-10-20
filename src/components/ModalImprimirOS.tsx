@@ -36,6 +36,7 @@ import {
 } from '../utils/whatsappHelper';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system/legacy';
 import { gerarHtmlImpressaoOS } from '../utils/imprimirOSHtml';
 
 interface ModalImprimirOSProps {
@@ -208,9 +209,35 @@ export const ModalImprimirOS: React.FC<ModalImprimirOSProps> = ({
         nomeOficina,
       });
 
-      const { uri } = await Print.printToFileAsync({ html });
+      // 1. Gera o PDF temporário a partir do HTML
+      const { uri: tempUri } = await Print.printToFileAsync({ html });
+
+      // 2. Normaliza o nome do arquivo para um nome limpo e profissional
+      const placaLimpa = (osCompleta.placa || '').replace(/[^a-zA-Z0-9]/g, '');
+      const prefixo = versao === 'orcamento' ? 'Orcamento' : 'OS';
+      const nomeArquivo = `${prefixo}_${osCompleta.numero}${placaLimpa ? '_' + placaLimpa : ''}.pdf`;
+
+      // 3. Copia para o cacheDirectory onde o FileProvider do Android possui permissão de leitura
+      const diretorioBase = FileSystem.cacheDirectory || FileSystem.documentDirectory || '';
+      const destinoFinal = `${diretorioBase}${nomeArquivo}`;
+
+      try {
+        const info = await FileSystem.getInfoAsync(destinoFinal);
+        if (info.exists) {
+          await FileSystem.deleteAsync(destinoFinal, { idempotent: true });
+        }
+      } catch {
+        // Ignora se não existir previamente
+      }
+
+      await FileSystem.copyAsync({
+        from: tempUri,
+        to: destinoFinal,
+      });
+
+      // 4. Compartilha o PDF no diretório autorizado
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, {
+        await Sharing.shareAsync(destinoFinal, {
           UTI: '.pdf',
           mimeType: 'application/pdf',
           dialogTitle: `Compartilhar ${versao === 'orcamento' ? 'Orçamento' : 'Ordem de Serviço'} #${osCompleta.numero}`,
