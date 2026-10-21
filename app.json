@@ -9,14 +9,14 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "br.com.aftecnologia.gestaomobile",
+      "bundleIdentifier": "br.com.autof",
       "infoPlist": {
         "NSCameraUsageDescription": "O aplicativo precisa de acesso à câmera para escanear códigos de barras e registrar avarias do veículo.",
         "NSPhotoLibraryUsageDescription": "O aplicativo precisa de acesso às fotos para anexar imagens de avarias do checklist."
       }
     },
     "android": {
-      "package": "br.com.aftecnologia.gestaomobile",
+      "package": "br.com.autof",
       "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#0F172A",
@@ -27,9 +27,7 @@
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",
-        "android.permission.WRITE_EXTERNAL_STORAGE",
-        "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.WRITE_EXTERNAL_STORAGE"
       ],
       "predictiveBackGestureEnabled": false
     },
