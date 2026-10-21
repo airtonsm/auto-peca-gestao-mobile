@@ -13,6 +13,7 @@ export interface UsuarioMe {
   deveTrocarSenha: boolean;
   permissoes: string[];
   plano: string;
+  oficinas?: OficinaDaSessao[];
 }
 
 export interface OficinaDaSessao {

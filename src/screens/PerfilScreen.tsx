@@ -14,6 +14,7 @@ import { useAuth } from '../context/AuthContext';
 import { CORES } from '../constants';
 import { extrairMensagemErro } from '../api/clienteHttp';
 import { ConfiguradorServidorModal } from '../components/ConfiguradorServidorModal';
+import { ModalTrocarOficina } from '../components/ModalTrocarOficina';
 import { authApi } from '../api/authApi';
 
 export const PerfilScreen: React.FC = () => {
@@ -28,6 +29,7 @@ export const PerfilScreen: React.FC = () => {
   } = useAuth();
 
   const [trocandoOficina, setTrocandoOficina] = useState<string | null>(null);
+  const [modalTrocarOficinaVisivel, setModalTrocarOficinaVisivel] = useState(false);
   const [modalServidorVisivel, setModalServidorVisivel] = useState(false);
   const [testandoSaude, setTestandoSaude] = useState(false);
 
@@ -111,6 +113,25 @@ export const PerfilScreen: React.FC = () => {
           </View>
         </View>
 
+        {/* Ações Rápidas: Trocar Oficina e Sair */}
+        <View style={styles.acoesRapidasLinha}>
+          <TouchableOpacity
+            style={styles.botaoAcaoRapidaOficina}
+            onPress={() => setModalTrocarOficinaVisivel(true)}
+          >
+            <Ionicons name="business" size={18} color={CORES.primariaClara} />
+            <Text style={styles.botaoAcaoRapidaOficinaTexto}>Trocar Oficina</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.botaoAcaoRapidaSair}
+            onPress={handleLogout}
+          >
+            <Ionicons name="log-out-outline" size={18} color={CORES.perigoTexto} />
+            <Text style={styles.botaoAcaoRapidaSairTexto}>Sair da Conta</Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Seção Mudar de Oficina (Multi-Tenant nativo) */}
         <View style={styles.secao}>
           <View style={styles.secaoTituloLinha}>
@@ -131,6 +152,19 @@ export const PerfilScreen: React.FC = () => {
               Tenant ID: {oficinaAtiva?.id || usuario?.tenantId || '---'}
             </Text>
           </View>
+
+          {/* Botão de Destaque para Trocar Oficina */}
+          <TouchableOpacity
+            style={styles.botaoAbrirModalTroca}
+            onPress={() => setModalTrocarOficinaVisivel(true)}
+          >
+            <Ionicons name="swap-horizontal" size={18} color="#FFFFFF" />
+            <Text style={styles.botaoAbrirModalTrocaTexto}>
+              {oficinasDisponiveis.length > 1
+                ? `Selecionar Outra Oficina (${oficinasDisponiveis.length} disponíveis)`
+                : 'Gerenciar / Trocar de Oficina'}
+            </Text>
+          </TouchableOpacity>
 
           {/* Lista de Outras Oficinas Permitidas */}
           {oficinasDisponiveis.length > 1 ? (
@@ -218,8 +252,8 @@ export const PerfilScreen: React.FC = () => {
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={styles.botaoAlterarIp}
-                onPress={() => setModalServidorVisivel(true)}
+                style={[styles.botaoAlterarIp, !__DEV__ && { display: 'none' }]}
+                onPress={__DEV__ ? () => setModalServidorVisivel(true) : undefined}
               >
                 <Ionicons name="settings-outline" size={16} color={CORES.texto} />
                 <Text style={styles.botaoAlterarIpTexto}>Mudar IP / Porta</Text>
@@ -239,6 +273,12 @@ export const PerfilScreen: React.FC = () => {
           AutoF Sistema de Gestão Mobile v1.0.0 (Build Produção)
         </Text>
       </ScrollView>
+
+      {/* Modal Trocar Oficina */}
+      <ModalTrocarOficina
+        visivel={modalTrocarOficinaVisivel}
+        aoFechar={() => setModalTrocarOficinaVisivel(false)}
+      />
 
       {/* Modal Configurador de Servidor */}
       <ConfiguradorServidorModal
@@ -268,6 +308,59 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: CORES.bordaSuave,
     gap: 14,
+  },
+  acoesRapidasLinha: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  botaoAcaoRapidaOficina: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(37, 99, 235, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(37, 99, 235, 0.4)',
+    borderRadius: 12,
+    paddingVertical: 12,
+    gap: 8,
+  },
+  botaoAcaoRapidaOficinaTexto: {
+    color: CORES.primariaClara,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  botaoAcaoRapidaSair: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(220, 38, 38, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(220, 38, 38, 0.4)',
+    borderRadius: 12,
+    paddingVertical: 12,
+    gap: 8,
+  },
+  botaoAcaoRapidaSairTexto: {
+    color: CORES.perigoTexto,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  botaoAbrirModalTroca: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: CORES.primaria,
+    borderRadius: 10,
+    paddingVertical: 12,
+    marginTop: 4,
+    gap: 8,
+  },
+  botaoAbrirModalTrocaTexto: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
   },
   avatarBox: {
     width: 60,

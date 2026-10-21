@@ -45,7 +45,11 @@ export const carregarConfiguracoesSalvas = async (): Promise<{
 }> => {
   try {
     const urlSalva = await SecureStore.getItemAsync(CONFIG_STORAGE_KEYS.API_BASE_URL);
-    if (urlSalva) {
+    if (!__DEV__) {
+      // Em produção (Play Store), a API oficial em nuvem é sempre a padrão
+      baseUrlEmMemoria = DEFAULT_API_URL;
+      clienteHttp.defaults.baseURL = DEFAULT_API_URL;
+    } else if (urlSalva) {
       baseUrlEmMemoria = urlSalva;
       clienteHttp.defaults.baseURL = urlSalva;
     }

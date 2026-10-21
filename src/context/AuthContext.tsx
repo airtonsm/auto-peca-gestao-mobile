@@ -72,6 +72,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               nome: me.empresa,
             });
 
+            // Carrega lista de oficinas do usuário
+            if (me.oficinas && me.oficinas.length > 0) {
+              setOficinasDisponiveis(me.oficinas);
+              await SecureStore.setItemAsync(
+                CONFIG_STORAGE_KEYS.OFICINAS_DISPONIVEIS,
+                JSON.stringify(me.oficinas)
+              );
+            } else {
+              const oficinasJson = await SecureStore.getItemAsync(CONFIG_STORAGE_KEYS.OFICINAS_DISPONIVEIS);
+              if (oficinasJson) {
+                try {
+                  const parsedOficinas = JSON.parse(oficinasJson);
+                  if (Array.isArray(parsedOficinas) && parsedOficinas.length > 0) {
+                    setOficinasDisponiveis(parsedOficinas);
+                  }
+                } catch {
+                  // ignora
+                }
+              }
+            }
+
             // Recupera oficina salva se houver
             const oficinaJson = await SecureStore.getItemAsync(CONFIG_STORAGE_KEYS.OFICINA_ATIVA);
             if (oficinaJson) {
@@ -183,8 +204,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setToken(resposta.tokenAcesso);
 
     // Salva lista de oficinas do usuário
-    if (resposta.oficinas && resposta.oficinas.length > 0) {
-      setOficinasDisponiveis(resposta.oficinas);
+    const oficinasRecebidas = resposta.oficinas && resposta.oficinas.length > 0 ? resposta.oficinas : [];
+    if (oficinasRecebidas.length > 0) {
+      setOficinasDisponiveis(oficinasRecebidas);
+      await SecureStore.setItemAsync(
+        CONFIG_STORAGE_KEYS.OFICINAS_DISPONIVEIS,
+        JSON.stringify(oficinasRecebidas)
+      );
     }
 
     // Busca perfil atualizado
@@ -199,6 +225,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (me) {
       setUsuario(me);
+      if (me.oficinas && me.oficinas.length > 0) {
+        setOficinasDisponiveis(me.oficinas);
+        await SecureStore.setItemAsync(
+          CONFIG_STORAGE_KEYS.OFICINAS_DISPONIVEIS,
+          JSON.stringify(me.oficinas)
+        );
+      }
       const oficina = {
         id: me.tenantId,
         nome: me.empresa,
@@ -239,6 +272,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await definirTokenAutenticacao(null);
     try {
       await SecureStore.deleteItemAsync(CONFIG_STORAGE_KEYS.OFICINA_ATIVA);
+      await SecureStore.deleteItemAsync(CONFIG_STORAGE_KEYS.OFICINAS_DISPONIVEIS);
       await SecureStore.deleteItemAsync(CONFIG_STORAGE_KEYS.USER);
     } catch (e) {
       // ignora
@@ -259,6 +293,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         id: me.tenantId,
         nome: me.empresa,
       });
+      if (me.oficinas && me.oficinas.length > 0) {
+        setOficinasDisponiveis(me.oficinas);
+        await SecureStore.setItemAsync(
+          CONFIG_STORAGE_KEYS.OFICINAS_DISPONIVEIS,
+          JSON.stringify(me.oficinas)
+        );
+      }
     } catch (e) {
       console.warn('Falha ao recarregar dados do usuário:', e);
     }

@@ -151,27 +151,21 @@ export const LoginScreen: React.FC = () => {
               )}
             </TouchableOpacity>
 
-            {/* Dica para Testes Locais */}
-            <View style={styles.dicaBox}>
-              <Ionicons name="information-circle-outline" size={16} color={CORES.textoMudo} />
-              <Text style={styles.dicaTexto}>
-                Conta de teste semeada:{'\n'}
-                <Text style={{ fontWeight: '700' }}>airton@aftecnologia.com.br</Text> (2 oficinas)
-              </Text>
-            </View>
           </View>
 
-          {/* Rodapé com Seletor de Servidor */}
-          <TouchableOpacity
-            style={styles.servidorRodape}
-            onPress={() => setModalServidorVisivel(true)}
-          >
-            <Ionicons name="server-outline" size={16} color={CORES.textoSecundario} />
-            <Text style={styles.servidorRodapeTexto} numberOfLines={1}>
-              API: {servidorUrl}
-            </Text>
-            <Ionicons name="pencil-sharp" size={14} color={CORES.primariaClara} />
-          </TouchableOpacity>
+          {/* Rodapé com Seletor de Servidor (Visível apenas em ambiente de desenvolvimento) */}
+          {__DEV__ && (
+            <TouchableOpacity
+              style={styles.servidorRodape}
+              onPress={() => setModalServidorVisivel(true)}
+            >
+              <Ionicons name="server-outline" size={16} color={CORES.textoSecundario} />
+              <Text style={styles.servidorRodapeTexto} numberOfLines={1}>
+                API (Dev): {servidorUrl}
+              </Text>
+              <Ionicons name="pencil-sharp" size={14} color={CORES.primariaClara} />
+            </TouchableOpacity>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
 

@@ -4,17 +4,17 @@ export const CONFIG_STORAGE_KEYS = {
   TOKEN: 'af_gestao_token',
   USER: 'af_gestao_user',
   OFICINA_ATIVA: 'af_gestao_oficina_ativa',
+  OFICINAS_DISPONIVEIS: 'af_gestao_oficinas_disponiveis',
   API_BASE_URL: 'af_gestao_api_base_url',
 };
 
-// URL padrão para a API backend
-export const DEFAULT_API_URL = 'http://192.168.2.6:8080';
+// URL padrão para a API backend (Nuvem Produção Oficial)
+export const DEFAULT_API_URL = 'https://af-gestao-oficina.web.app';
 
 export const SERVIDORES_PREDEFINIDOS = [
   { label: 'Nuvem Produção (af-gestao-oficina.web.app)', value: 'https://af-gestao-oficina.web.app' },
   { label: 'Wi-Fi Local (192.168.2.6:8080)', value: 'http://192.168.2.6:8080' },
   { label: 'Emulador Android (10.0.2.2:8080)', value: 'http://10.0.2.2:8080' },
-  { label: 'Rede Local Secundária (10.10.10.24:8080)', value: 'http://10.10.10.24:8080' },
   { label: 'Localhost (127.0.0.1:8080)', value: 'http://localhost:8080' },
 ];
 
