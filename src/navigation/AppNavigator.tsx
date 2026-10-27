@@ -12,6 +12,7 @@ import { ModalTrocarOficina } from '../components/ModalTrocarOficina';
 // Telas
 import { LoginScreen } from '../screens/LoginScreen';
 import { PatioScreen } from '../screens/PatioScreen';
+import { VendasScreen } from '../screens/VendasScreen';
 import { EstoqueScreen } from '../screens/EstoqueScreen';
 import { ChecklistScreen } from '../screens/ChecklistScreen';
 import { PerfilScreen } from '../screens/PerfilScreen';
@@ -130,6 +131,17 @@ const AbasPrincipais = () => {
             tabBarLabel: 'Pátio (OS)',
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="car-sport" size={size} color={color} />
+            ),
+          }}
+        />
+        <Tab.Screen
+          name="Vendas"
+          component={VendasScreen}
+          options={{
+            title: 'Vendas de Peças',
+            tabBarLabel: 'Vendas',
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="cart-outline" size={size} color={color} />
             ),
           }}
         />

@@ -104,7 +104,7 @@ clienteHttp.interceptors.response.use(
 /**
  * Extrai uma mensagem amigável de erro da resposta da API ou da falha de rede
  */
-export const extrairMensagemErro = (error: unknown): string => {
+export const extrairMensagemErro = (error: unknown, mensagemPadrao?: string): string => {
   if (axios.isAxiosError(error)) {
     const data = error.response?.data as Record<string, any> | undefined;
 
@@ -135,11 +135,11 @@ export const extrairMensagemErro = (error: unknown): string => {
     }
 
     if (error.response?.status === 404) {
-      return 'Recurso não encontrado no servidor.';
+      return mensagemPadrao || 'Recurso não encontrado no servidor.';
     }
 
     if (error.response?.status >= 500) {
-      return 'Erro interno no servidor da oficina. Tente novamente em instantes.';
+      return mensagemPadrao || 'Erro interno no servidor da oficina. Tente novamente em instantes.';
     }
   }
 
@@ -147,5 +147,5 @@ export const extrairMensagemErro = (error: unknown): string => {
     return error.message;
   }
 
-  return 'Ocorreu um erro inesperado ao processar a operação.';
+  return mensagemPadrao || 'Ocorreu um erro inesperado ao processar a operação.';
 };

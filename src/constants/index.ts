@@ -25,6 +25,7 @@ export const CORES = {
   fundo: '#0F172A',
   superficie: '#1E293B',
   superficieClara: '#334155',
+  superficieElevada: '#334155',
   borda: '#475569',
   bordaSuave: '#334155',
   texto: '#F8FAFC',

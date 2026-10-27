@@ -400,3 +400,84 @@ export interface PedidoCriarOS {
   status: 'recebido' | 'agendado';
   confirmarKmMenor?: boolean;
 }
+
+
+// ============================================================================
+// Tipos para Venda de Peças / Balcão e Orçamentos (AF-0174, AF-0175)
+// ============================================================================
+
+export interface ItemVenda {
+  id: string;
+  pecaId: string | null;
+  descricao: string;
+  quantidade: number;
+  custoUnitario: number | null;
+  precoUnitario: number;
+  desconto: number;
+  total: number;
+}
+
+export interface VendaBalcao {
+  id: string;
+  numero: number;
+  clienteId: string | null;
+  clienteNome?: string | null;
+  vendedorId: string | null;
+  vendedorNome?: string | null;
+  desconto: number;
+  formaPagamento: string;
+  autorizacaoCartao?: string | null;
+  total: number;
+  custoTotal: number | null;
+  margem: number | null;
+  status: 'fechada' | 'aberta' | 'orcamento' | 'cancelada' | string;
+  validaAte?: string | null;
+  vencido?: boolean | null;
+  criadaEm: string;
+  itens: ItemVenda[];
+}
+
+export interface ItemComprovanteVenda {
+  id: string;
+  pecaId: string;
+  codigo: string | null;
+  marca?: string | null;
+  descricao: string;
+  quantidade: number;
+  precoUnitario: number;
+  desconto: number;
+  total: number;
+}
+
+export interface ComprovanteVenda {
+  id: string;
+  numero: number;
+  criadaEm: string;
+  status: string;
+  validaAte?: string | null;
+  vencido?: boolean | null;
+  formaPagamento: string | null;
+  parcelas: number | null;
+  autorizacaoCartao: string | null;
+  observacoes?: string | null;
+  subtotal: number;
+  desconto: number;
+  total: number;
+  clienteId: string | null;
+  clienteNome: string | null;
+  clienteDocumento: string | null;
+  clienteTelefone: string | null;
+  vendedorId: string | null;
+  vendedorNome: string | null;
+  itens: ItemComprovanteVenda[];
+}
+
+export interface PedidoFecharVenda {
+  formaPagamento: string;
+  desconto: number;
+  motivo?: string | null;
+  parcelas?: number;
+  autorizacaoCartao?: string;
+  autorizacaoCreditoId?: string | null;
+  observacoes?: string;
+}
