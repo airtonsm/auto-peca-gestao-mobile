@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, ActivityIndicator, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, ActivityIndicator, StyleSheet, TouchableOpacity, Alert, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -53,6 +54,7 @@ const HeaderOficinaComLogo: React.FC<HeaderOficinaComLogoProps> = ({ aoTocar }) 
 };
 
 const AbasPrincipais = () => {
+  const insets = useSafeAreaInsets();
   const { logout } = useAuth();
   const [modalTrocarOficinaVisivel, setModalTrocarOficinaVisivel] = useState(false);
 
@@ -106,18 +108,22 @@ const AbasPrincipais = () => {
               </TouchableOpacity>
             </View>
           ),
+          tabBarHideOnKeyboard: true,
           tabBarStyle: {
             backgroundColor: CORES.superficie,
             borderTopColor: CORES.bordaSuave,
-            height: 60,
-            paddingBottom: 8,
+            height: 60 + Math.max(insets.bottom, 12),
+            paddingBottom: Math.max(insets.bottom, 12),
             paddingTop: 8,
           },
           tabBarActiveTintColor: CORES.primariaClara,
           tabBarInactiveTintColor: CORES.textoMudo,
           tabBarLabelStyle: {
-            fontSize: 12,
+            fontSize: 11,
             fontWeight: '700',
+          },
+          tabBarItemStyle: {
+            paddingVertical: 2,
           },
         }}
       >
@@ -128,7 +134,7 @@ const AbasPrincipais = () => {
             headerTitle: () => (
               <HeaderOficinaComLogo aoTocar={() => setModalTrocarOficinaVisivel(true)} />
             ),
-            tabBarLabel: 'Pátio (OS)',
+            tabBarLabel: 'Pátio',
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="car-sport" size={size} color={color} />
             ),
@@ -141,7 +147,7 @@ const AbasPrincipais = () => {
             title: 'Vendas de Peças',
             tabBarLabel: 'Vendas',
             tabBarIcon: ({ color, size }) => (
-              <Ionicons name="cart-outline" size={size} color={color} />
+              <Ionicons name="cart" size={size} color={color} />
             ),
           }}
         />
@@ -150,7 +156,7 @@ const AbasPrincipais = () => {
           component={EstoqueScreen}
           options={{
             title: 'Consulta de Estoque',
-            tabBarLabel: 'Consultar Estoque',
+            tabBarLabel: 'Estoque',
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="search" size={size} color={color} />
             ),
