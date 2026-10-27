@@ -130,7 +130,7 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
       onRequestClose={handleFechar}
     >
       <View style={styles.container}>
-        <StatusBar barStyle="light-content" backgroundColor="#000000" />
+        <StatusBar barStyle="light-content" />
 
         {/* Câmera ou Prévia da Foto */}
         <View style={styles.cameraWrapper}>
