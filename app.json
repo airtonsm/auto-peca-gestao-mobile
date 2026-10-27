@@ -17,7 +17,7 @@
     },
     "android": {
       "package": "br.com.autof",
-      "versionCode": 5,
+      "versionCode": 6,
       "adaptiveIcon": {
         "backgroundColor": "#1f4fd8",
         "foregroundImage": "./assets/android-icon-foreground.png",
