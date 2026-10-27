@@ -218,7 +218,7 @@ export const ModalDetalheVenda: React.FC<ModalDetalheVendaProps> = ({
         ) : (
           <ScrollView
             style={styles.conteudo}
-            contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]}
+            contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 150 }]}
           >
             {/* Faixa de Status */}
             <View
@@ -431,55 +431,57 @@ export const ModalDetalheVenda: React.FC<ModalDetalheVendaProps> = ({
 
         {/* Rodapé de Ações */}
         {comprovante && !carregando && (
-          <View style={[styles.rodapeAcoes, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-            {/* Botão WhatsApp */}
-            <TouchableOpacity
-              style={styles.botaoAcaoWhatsapp}
-              onPress={handleCompartilharWhatsApp}
-              disabled={processandoAcao}
-            >
-              <Ionicons name="logo-whatsapp" size={18} color="#FFFFFF" />
-              <Text style={styles.botaoAcaoTexto}>WhatsApp</Text>
-            </TouchableOpacity>
-
-            {/* Botão Imprimir / PDF */}
-            <TouchableOpacity
-              style={styles.botaoAcaoPdf}
-              onPress={handleImprimirOuCompartilharPDF}
-              disabled={processandoAcao}
-            >
-              {processandoAcao ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <>
-                  <Ionicons name="print-outline" size={18} color="#FFFFFF" />
-                  <Text style={styles.botaoAcaoTexto}>Imprimir / PDF</Text>
-                </>
-              )}
-            </TouchableOpacity>
-
-            {/* Se for orçamento: Botão Aprovar */}
+          <View style={[styles.rodapeAcoes, { paddingBottom: Math.max(insets.bottom, 14) }]}>
+            {/* Se for orçamento: Botão Destacado de Aprovação */}
             {ehOrcamento && !ehCancelada && (
               <TouchableOpacity
                 style={styles.botaoAcaoAprovar}
                 onPress={() => setDialogoAprovacaoAberto(true)}
                 disabled={processandoAcao}
               >
-                <Ionicons name="checkmark-done" size={18} color="#FFFFFF" />
-                <Text style={styles.botaoAcaoTexto}>Aprovar</Text>
+                <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
+                <Text style={styles.botaoAcaoAprovarTexto}>Aprovar Orçamento e Vender</Text>
               </TouchableOpacity>
             )}
 
-            {/* Botão Cancelar */}
-            {!ehCancelada && (
+            {/* Linha de Ações: WhatsApp, Imprimir/PDF e Cancelar */}
+            <View style={styles.linhaAcoesSecundarias}>
               <TouchableOpacity
-                style={styles.botaoAcaoCancelar}
-                onPress={handleCancelar}
+                style={styles.botaoAcaoWhatsapp}
+                onPress={handleCompartilharWhatsApp}
                 disabled={processandoAcao}
               >
-                <Ionicons name="close" size={18} color={CORES.perigoTexto} />
+                <Ionicons name="logo-whatsapp" size={18} color="#FFFFFF" />
+                <Text style={styles.botaoAcaoTexto}>WhatsApp</Text>
               </TouchableOpacity>
-            )}
+
+              <TouchableOpacity
+                style={styles.botaoAcaoPdf}
+                onPress={handleImprimirOuCompartilharPDF}
+                disabled={processandoAcao}
+              >
+                {processandoAcao ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Ionicons name="print-outline" size={18} color="#FFFFFF" />
+                    <Text style={styles.botaoAcaoTexto}>Imprimir / PDF</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+
+              {!ehCancelada && (
+                <TouchableOpacity
+                  style={styles.botaoAcaoCancelar}
+                  onPress={handleCancelar}
+                  disabled={processandoAcao}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  accessibilityLabel="Cancelar Operação"
+                >
+                  <Ionicons name="trash-outline" size={18} color={CORES.perigoTexto} />
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
         )}
 
@@ -847,14 +849,33 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    flexDirection: 'row',
     backgroundColor: CORES.superficie,
     paddingHorizontal: 16,
     paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: CORES.bordaSuave,
-    gap: 8,
+    gap: 10,
+  },
+  botaoAcaoAprovar: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: CORES.sucesso,
+    paddingVertical: 13,
+    borderRadius: 10,
+    width: '100%',
+  },
+  botaoAcaoAprovarTexto: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 14,
+  },
+  linhaAcoesSecundarias: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    width: '100%',
   },
   botaoAcaoWhatsapp: {
     flex: 1,
@@ -864,7 +885,7 @@ const styles = StyleSheet.create({
     gap: 6,
     backgroundColor: '#25D366',
     paddingVertical: 12,
-    borderRadius: 8,
+    borderRadius: 10,
   },
   botaoAcaoPdf: {
     flex: 1.2,
@@ -874,28 +895,19 @@ const styles = StyleSheet.create({
     gap: 6,
     backgroundColor: CORES.primaria,
     paddingVertical: 12,
-    borderRadius: 8,
-  },
-  botaoAcaoAprovar: {
-    flex: 1.1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: CORES.sucesso,
-    paddingVertical: 12,
-    borderRadius: 8,
+    borderRadius: 10,
   },
   botaoAcaoCancelar: {
-    padding: 12,
-    borderRadius: 8,
+    width: 44,
+    height: 44,
+    borderRadius: 10,
     backgroundColor: CORES.perigoFundo,
     alignItems: 'center',
     justifyContent: 'center',
   },
   botaoAcaoTexto: {
     color: '#FFFFFF',
-    fontWeight: '700',
+    fontWeight: '800',
     fontSize: 13,
   },
   modalOverlay: {
