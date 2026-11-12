@@ -23,6 +23,7 @@ import { extrairMensagemErro } from '../api/clienteHttp';
 import { BarcodeScannerModal } from '../components/BarcodeScannerModal';
 import { PlacaVeiculo } from '../components/PlacaVeiculo';
 import { ModalConfirmarLancamentoPeca } from '../components/ModalConfirmarLancamentoPeca';
+import { ModalCadastroPeca } from '../components/ModalCadastroPeca';
 
 export const EstoqueScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -34,6 +35,31 @@ export const EstoqueScreen: React.FC = () => {
   const [scannerVisivel, setScannerVisivel] = useState(false);
   const [pecaSelecionada, setPecaSelecionada] = useState<RespostaPeca | null>(null);
   const [filtroDisponibilidade, setFiltroDisponibilidade] = useState<'todos' | 'com-saldo' | 'zerados'>('todos');
+
+  // Estados para cadastro rápido de peça
+  const [modalCadastroVisivel, setModalCadastroVisivel] = useState(false);
+  const [codigoBarrasParaCadastro, setCodigoBarrasParaCadastro] = useState('');
+  const [descricaoParaCadastro, setDescricaoParaCadastro] = useState('');
+
+  const abrirCadastroComTermo = (termo: string = '') => {
+    const limpo = (termo || '').trim();
+    const ehNumerico = /^\d{6,}$/.test(limpo);
+    if (ehNumerico) {
+      setCodigoBarrasParaCadastro(limpo);
+      setDescricaoParaCadastro('');
+    } else {
+      setCodigoBarrasParaCadastro('');
+      setDescricaoParaCadastro(limpo);
+    }
+    setModalCadastroVisivel(true);
+  };
+
+  const handlePecaCriada = (novaPeca: RespostaPeca) => {
+    const termo = novaPeca.codigoInterno || novaPeca.descricao;
+    setTermoBusca(termo);
+    carregarPecas(termo);
+    setPecaSelecionada(novaPeca);
+  };
 
   // Estados para lançamento da peça em uma OS aberta
   const [modalSelecaoOSVisivel, setModalSelecaoOSVisivel] = useState(false);
@@ -289,6 +315,16 @@ export const EstoqueScreen: React.FC = () => {
         >
           <Ionicons name="barcode-outline" size={24} color="#FFFFFF" />
         </TouchableOpacity>
+
+        {/* Botão Atalho Nova Peça */}
+        <TouchableOpacity
+          style={styles.botaoNovaPeca}
+          onPress={() => abrirCadastroComTermo('')}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="add" size={18} color="#FFFFFF" />
+          <Text style={styles.botaoNovaPecaTexto}>Nova</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Filtros Rápidos de Disponibilidade */}
@@ -388,15 +424,49 @@ export const EstoqueScreen: React.FC = () => {
           }
           ListEmptyComponent={
             <View style={styles.vazioContainer}>
-              <Ionicons name="file-tray-outline" size={64} color={CORES.borda} />
-              <Text style={styles.vazioTitulo}>Nenhuma peça encontrada</Text>
+              <Ionicons
+                name={termoBusca ? 'barcode-outline' : 'file-tray-outline'}
+                size={58}
+                color={termoBusca ? '#A855F7' : CORES.borda}
+              />
+              <Text style={styles.vazioTitulo}>
+                {termoBusca ? 'Peça não encontrada' : 'Nenhuma peça encontrada'}
+              </Text>
               <Text style={styles.vazioSubtitulo}>
                 {termoBusca
-                  ? `Não encontramos itens correspondentes a "${termoBusca}". Tente outro código ou escaneie o código de barras da peça.`
+                  ? `Nenhuma peça correspondente a "${termoBusca}" foi encontrada no estoque desta oficina.`
                   : filtroDisponibilidade !== 'todos'
                   ? 'Nenhuma peça correspondente ao filtro de estoque selecionado.'
                   : 'Nenhuma peça cadastrada no catálogo desta oficina.'}
               </Text>
+
+              {/* Botão em destaque para cadastrar com o código ou nome */}
+              {termoBusca ? (
+                <TouchableOpacity
+                  style={styles.botaoCadastrarVazio}
+                  activeOpacity={0.8}
+                  onPress={() => abrirCadastroComTermo(termoBusca)}
+                >
+                  <Ionicons name="add-circle" size={20} color="#FFFFFF" />
+                  <Text style={styles.botaoCadastrarVazioTexto}>
+                    {/^\d{6,}$/.test(termoBusca.trim())
+                      ? 'Cadastrar Nova Peça com este Código'
+                      : 'Cadastrar Nova Peça com este Nome'}
+                  </Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={styles.botaoCadastrarVazio}
+                  activeOpacity={0.8}
+                  onPress={() => abrirCadastroComTermo('')}
+                >
+                  <Ionicons name="add-circle" size={20} color="#FFFFFF" />
+                  <Text style={styles.botaoCadastrarVazioTexto}>
+                    Cadastrar Nova Peça
+                  </Text>
+                </TouchableOpacity>
+              )}
+
               {termoBusca || filtroDisponibilidade !== 'todos' ? (
                 <TouchableOpacity
                   style={styles.botaoLimparFiltros}
@@ -418,6 +488,15 @@ export const EstoqueScreen: React.FC = () => {
         visivel={scannerVisivel}
         aoFechar={() => setScannerVisivel(false)}
         aoEscanear={handleCodigoEscaneado}
+      />
+
+      {/* Modal Cadastro Rápido de Peças */}
+      <ModalCadastroPeca
+        visivel={modalCadastroVisivel}
+        aoFechar={() => setModalCadastroVisivel(false)}
+        aoSalvar={handlePecaCriada}
+        codigoBarrasInicial={codigoBarrasParaCadastro}
+        descricaoInicial={descricaoParaCadastro}
       />
 
       {/* Modal Ficha Rápida da Peça */}
@@ -703,6 +782,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     elevation: 3,
   },
+  botaoNovaPeca: {
+    height: 44,
+    backgroundColor: '#7C3AED',
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    elevation: 3,
+  },
+  botaoNovaPecaTexto: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
   erroBox: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -865,6 +960,23 @@ const styles = StyleSheet.create({
     fontSize: 13,
     textAlign: 'center',
     lineHeight: 18,
+  },
+  botaoCadastrarVazio: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#7C3AED',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    gap: 8,
+    marginTop: 18,
+    elevation: 2,
+  },
+  botaoCadastrarVazioTexto: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
   },
   botaoLimparFiltros: {
     marginTop: 16,

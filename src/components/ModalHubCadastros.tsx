@@ -10,10 +10,11 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { CORES } from '../constants';
-import { RespostaCliente, RespostaVeiculo, RespostaServico } from '../types';
+import { RespostaCliente, RespostaVeiculo, RespostaServico, RespostaPeca } from '../types';
 import { ModalCadastroCliente } from './ModalCadastroCliente';
 import { ModalCadastroVeiculo } from './ModalCadastroVeiculo';
 import { ModalCadastroServico } from './ModalCadastroServico';
+import { ModalCadastroPeca } from './ModalCadastroPeca';
 
 interface ModalHubCadastrosProps {
   visivel: boolean;
@@ -21,6 +22,7 @@ interface ModalHubCadastrosProps {
   aoClienteCriado?: (cliente: RespostaCliente) => void;
   aoVeiculoCriado?: (veiculo: RespostaVeiculo) => void;
   aoServicoCriado?: (servico: RespostaServico) => void;
+  aoPecaCriada?: (peca: RespostaPeca) => void;
 }
 
 export const ModalHubCadastros: React.FC<ModalHubCadastrosProps> = ({
@@ -29,12 +31,14 @@ export const ModalHubCadastros: React.FC<ModalHubCadastrosProps> = ({
   aoClienteCriado,
   aoVeiculoCriado,
   aoServicoCriado,
+  aoPecaCriada,
 }) => {
   const insets = useSafeAreaInsets();
 
   const [modalClienteVisivel, setModalClienteVisivel] = useState(false);
   const [modalVeiculoVisivel, setModalVeiculoVisivel] = useState(false);
   const [modalServicoVisivel, setModalServicoVisivel] = useState(false);
+  const [modalPecaVisivel, setModalPecaVisivel] = useState(false);
 
   const abrirCadastroCliente = () => {
     setModalClienteVisivel(true);
@@ -46,6 +50,10 @@ export const ModalHubCadastros: React.FC<ModalHubCadastrosProps> = ({
 
   const abrirCadastroServico = () => {
     setModalServicoVisivel(true);
+  };
+
+  const abrirCadastroPeca = () => {
+    setModalPecaVisivel(true);
   };
 
   const handleClienteSalvo = (cliente: RespostaCliente) => {
@@ -69,6 +77,14 @@ export const ModalHubCadastros: React.FC<ModalHubCadastrosProps> = ({
       aoServicoCriado(servico);
     }
     Alert.alert('Serviço Cadastrado!', `"${servico.nome}" cadastrado com sucesso.`);
+    aoFechar();
+  };
+
+  const handlePecaSalva = (peca: RespostaPeca) => {
+    if (aoPecaCriada) {
+      aoPecaCriada(peca);
+    }
+    Alert.alert('Peça Cadastrada!', `"${peca.descricao}" cadastrada no estoque com sucesso.`);
     aoFechar();
   };
 
@@ -190,6 +206,31 @@ export const ModalHubCadastros: React.FC<ModalHubCadastrosProps> = ({
 
                 <Ionicons name="chevron-forward" size={20} color={CORES.textoMudo} />
               </TouchableOpacity>
+
+              {/* Card 4: Nova Peça / Escanear */}
+              <TouchableOpacity
+                style={styles.cardAcao}
+                activeOpacity={0.8}
+                onPress={abrirCadastroPeca}
+              >
+                <View style={[styles.cardIconeBox, { backgroundColor: 'rgba(168, 85, 247, 0.15)' }]}>
+                  <Ionicons name="cube" size={26} color="#A855F7" />
+                </View>
+
+                <View style={styles.cardTextos}>
+                  <View style={styles.cardTituloLinha}>
+                    <Text style={styles.cardTitulo}>Nova Peça / Produto</Text>
+                    <View style={[styles.tagRapido, { backgroundColor: 'rgba(168, 85, 247, 0.15)' }]}>
+                      <Text style={[styles.tagRapidoTexto, { color: '#C084FC' }]}>Escanear</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.cardDescricao}>
+                    Cadastro rápido com leitor de código de barras pela câmera, preço e prateleira.
+                  </Text>
+                </View>
+
+                <Ionicons name="chevron-forward" size={20} color={CORES.textoMudo} />
+              </TouchableOpacity>
             </View>
           </TouchableOpacity>
         </TouchableOpacity>
@@ -212,6 +253,12 @@ export const ModalHubCadastros: React.FC<ModalHubCadastrosProps> = ({
         visivel={modalServicoVisivel}
         aoFechar={() => setModalServicoVisivel(false)}
         aoSalvar={handleServicoSalvo}
+      />
+
+      <ModalCadastroPeca
+        visivel={modalPecaVisivel}
+        aoFechar={() => setModalPecaVisivel(false)}
+        aoSalvar={handlePecaSalva}
       />
     </>
   );

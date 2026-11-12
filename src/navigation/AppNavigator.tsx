@@ -203,6 +203,9 @@ const AbasPrincipais = () => {
         aoServicoCriado={(srv) => {
           Alert.alert('Sucesso', `Serviço "${srv.nome}" cadastrado com sucesso!`);
         }}
+        aoPecaCriada={(peca) => {
+          Alert.alert('Sucesso', `Peça "${peca.descricao}" cadastrada no estoque com sucesso!`);
+        }}
       />
 
       {/* Modais Diretos dos Cadastros */}

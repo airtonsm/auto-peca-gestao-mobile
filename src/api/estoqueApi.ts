@@ -1,5 +1,7 @@
 import { clienteHttp } from './clienteHttp';
-import { RespostaPeca } from '../types';
+import { RespostaPeca, PedidoCriarPeca } from '../types';
+
+export { PedidoCriarPeca };
 
 export const estoqueApi = {
   /**
@@ -21,6 +23,14 @@ export const estoqueApi = {
    */
   async obterPorId(id: string): Promise<RespostaPeca> {
     const response = await clienteHttp.get<RespostaPeca>(`/api/pecas/${id}`);
+    return response.data;
+  },
+
+  /**
+   * Cadastra uma nova peça no catálogo com suporte a saldo inicial físico.
+   */
+  async criarPeca(pedido: PedidoCriarPeca): Promise<RespostaPeca> {
+    const response = await clienteHttp.post<RespostaPeca>('/api/pecas', pedido);
     return response.data;
   },
 };

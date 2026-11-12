@@ -52,6 +52,17 @@ export interface RespostaPeca {
   garantiaDias?: number;
 }
 
+export interface PedidoCriarPeca {
+  gtin?: string;
+  descricao: string;
+  fabricante?: string;
+  preco: number;
+  unidade?: string;
+  localizacao?: string;
+  quantidadeInicial?: number;
+  custoInicial?: number;
+}
+
 export interface RespostaOSResumo {
   id: string;
   numero: number;

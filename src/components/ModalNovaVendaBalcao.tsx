@@ -28,6 +28,7 @@ import { vendasApi } from '../api/vendasApi';
 import { extrairMensagemErro } from '../api/clienteHttp';
 import { formatarMoeda } from '../utils/imprimirVendaHtml';
 import { BarcodeScannerModal } from './BarcodeScannerModal';
+import { ModalCadastroPeca } from './ModalCadastroPeca';
 
 interface ItemCarrinho {
   peca: RespostaPeca;
@@ -66,6 +67,9 @@ export const ModalNovaVendaBalcao: React.FC<ModalNovaVendaBalcaoProps> = ({
   const [pecasEncontradas, setPecasEncontradas] = useState<RespostaPeca[]>([]);
   const [buscandoPecas, setBuscandoPecas] = useState<boolean>(false);
   const [scannerVisivel, setScannerVisivel] = useState<boolean>(false);
+  const [modalCadastroPecaVisivel, setModalCadastroPecaVisivel] = useState<boolean>(false);
+  const [codigoBarrasCadastro, setCodigoBarrasCadastro] = useState<string>('');
+  const [descricaoCadastro, setDescricaoCadastro] = useState<string>('');
 
   // Pagamento e Fechamento
   const [descontoTexto, setDescontoTexto] = useState<string>('0');
@@ -148,13 +152,32 @@ export const ModalNovaVendaBalcao: React.FC<ModalNovaVendaBalcaoProps> = ({
         setPecasEncontradas(resultados);
         setTermoPeca(codigo);
       } else {
-        Alert.alert('Não encontrada', `Nenhuma peça com o código ${codigo} foi encontrada no estoque.`);
+        Alert.alert(
+          'Peça Não Encontrada',
+          `Nenhuma peça com o código ${codigo} foi encontrada no estoque. Deseja cadastrá-la agora?`,
+          [
+            { text: 'Cancelar', style: 'cancel' },
+            {
+              text: 'Cadastrar Peça',
+              onPress: () => {
+                setCodigoBarrasCadastro(codigo.trim());
+                setDescricaoCadastro('');
+                setModalCadastroPecaVisivel(true);
+              },
+            },
+          ]
+        );
       }
     } catch (e) {
       Alert.alert('Erro', 'Falha ao buscar peça pelo código escaneado.');
     } finally {
       setBuscandoPecas(false);
     }
+  };
+
+  const handlePecaCadastrada = (novaPeca: RespostaPeca) => {
+    adicionarAoCarrinho(novaPeca);
+    Alert.alert('Adicionada ao Carrinho', `"${novaPeca.descricao}" foi cadastrada e adicionada à venda.`);
   };
 
   // Gerenciamento de itens no carrinho
@@ -455,8 +478,22 @@ export const ModalNovaVendaBalcao: React.FC<ModalNovaVendaBalcaoProps> = ({
           {/* Seção Adicionar Peças */}
           <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <Ionicons name="barcode-outline" size={18} color={CORES.primariaClara} />
-              <Text style={styles.cardTitulo}>Buscar Peças no Estoque</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+                <Ionicons name="barcode-outline" size={18} color={CORES.primariaClara} />
+                <Text style={styles.cardTitulo}>Buscar Peças no Estoque</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.botaoNovaPecaCard}
+                activeOpacity={0.8}
+                onPress={() => {
+                  setCodigoBarrasCadastro('');
+                  setDescricaoCadastro(termoPeca.trim());
+                  setModalCadastroPecaVisivel(true);
+                }}
+              >
+                <Ionicons name="add" size={15} color="#FFFFFF" />
+                <Text style={styles.botaoNovaPecaCardTexto}>Nova Peça</Text>
+              </TouchableOpacity>
             </View>
 
             <View style={styles.linhaBuscaPeca}>
@@ -517,6 +554,37 @@ export const ModalNovaVendaBalcao: React.FC<ModalNovaVendaBalcaoProps> = ({
                     </View>
                   </TouchableOpacity>
                 ))}
+              </View>
+            )}
+
+            {/* Estado Vazio inteligente quando busca de peças não traz resultado */}
+            {termoPeca.trim().length >= 2 && !buscandoPecas && pecasEncontradas.length === 0 && (
+              <View style={styles.pecaNaoEncontradaBox}>
+                <Ionicons name="search-outline" size={24} color={CORES.textoMudo} />
+                <Text style={styles.pecaNaoEncontradaTexto}>
+                  Nenhuma peça encontrada com "{termoPeca}".
+                </Text>
+                <TouchableOpacity
+                  style={styles.botaoCadastrarPecaVenda}
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    const limpo = termoPeca.trim();
+                    const ehNum = /^\d{6,}$/.test(limpo);
+                    if (ehNum) {
+                      setCodigoBarrasCadastro(limpo);
+                      setDescricaoCadastro('');
+                    } else {
+                      setCodigoBarrasCadastro('');
+                      setDescricaoCadastro(limpo);
+                    }
+                    setModalCadastroPecaVisivel(true);
+                  }}
+                >
+                  <Ionicons name="add-circle" size={16} color="#FFFFFF" />
+                  <Text style={styles.botaoCadastrarPecaVendaTexto}>
+                    Cadastrar e Adicionar ao Carrinho
+                  </Text>
+                </TouchableOpacity>
               </View>
             )}
           </View>
@@ -755,6 +823,15 @@ export const ModalNovaVendaBalcao: React.FC<ModalNovaVendaBalcaoProps> = ({
           aoFechar={() => setScannerVisivel(false)}
           aoEscanear={handleCodigoDeBarras}
         />
+
+        {/* Modal de Cadastro Rápido de Peças */}
+        <ModalCadastroPeca
+          visivel={modalCadastroPecaVisivel}
+          aoFechar={() => setModalCadastroPecaVisivel(false)}
+          aoSalvar={handlePecaCadastrada}
+          codigoBarrasInicial={codigoBarrasCadastro}
+          descricaoInicial={descricaoCadastro}
+        />
       </KeyboardAvoidingView>
     </Modal>
   );
@@ -925,6 +1002,20 @@ const styles = StyleSheet.create({
     color: CORES.textoMudo,
     marginTop: 2,
   },
+  botaoNovaPecaCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#7C3AED',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+    gap: 4,
+  },
+  botaoNovaPecaCardTexto: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
   linhaBuscaPeca: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -996,6 +1087,37 @@ const styles = StyleSheet.create({
     height: 24,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  pecaNaoEncontradaBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    backgroundColor: CORES.fundo,
+    borderRadius: 8,
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: CORES.bordaSuave,
+    gap: 8,
+  },
+  pecaNaoEncontradaTexto: {
+    fontSize: 13,
+    color: CORES.textoSecundario,
+    textAlign: 'center',
+  },
+  botaoCadastrarPecaVenda: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#7C3AED',
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 8,
+    gap: 6,
+    marginTop: 4,
+  },
+  botaoCadastrarPecaVendaTexto: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
   },
   carrinhoVazio: {
     alignItems: 'center',

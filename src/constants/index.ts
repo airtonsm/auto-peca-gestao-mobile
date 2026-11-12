@@ -19,8 +19,11 @@ export const DEFAULT_API_URL = 'https://af-gestao-oficina.web.app';
 export const SERVIDORES_PREDEFINIDOS = [
   { label: 'Nuvem Produção (af-gestao-oficina.web.app)', value: 'https://af-gestao-oficina.web.app' },
   { label: 'Wi-Fi Local (192.168.2.6:8080)', value: 'http://192.168.2.6:8080' },
+  { label: 'Wi-Fi Local (192.168.2.6:8082)', value: 'http://192.168.2.6:8082' },
   { label: 'Emulador Android (10.0.2.2:8080)', value: 'http://10.0.2.2:8080' },
+  { label: 'Emulador Android (10.0.2.2:8082)', value: 'http://10.0.2.2:8082' },
   { label: 'Localhost (127.0.0.1:8080)', value: 'http://localhost:8080' },
+  { label: 'Localhost (127.0.0.1:8082)', value: 'http://localhost:8082' },
 ];
 
 export const CORES = {
