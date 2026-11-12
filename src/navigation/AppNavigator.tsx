@@ -1,14 +1,21 @@
 import React, { useState } from 'react';
 import { View, Text, ActivityIndicator, StyleSheet, TouchableOpacity, Alert, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { CORES } from '../constants';
 import { AutoFLogo } from '../components/AutoFLogo';
+import { ImagemAutenticada } from '../components/ImagemAutenticada';
 import { ModalTrocarOficina } from '../components/ModalTrocarOficina';
+import { ModalAtivacaoBiometria } from '../components/ModalAtivacaoBiometria';
+import { ModalHubCadastros } from '../components/ModalHubCadastros';
+import { ModalMenuSanduiche } from '../components/ModalMenuSanduiche';
+import { ModalCadastroCliente } from '../components/ModalCadastroCliente';
+import { ModalCadastroVeiculo } from '../components/ModalCadastroVeiculo';
+import { ModalCadastroServico } from '../components/ModalCadastroServico';
 
 // Telas
 import { LoginScreen } from '../screens/LoginScreen';
@@ -26,7 +33,7 @@ interface HeaderOficinaComLogoProps {
 }
 
 const HeaderOficinaComLogo: React.FC<HeaderOficinaComLogoProps> = ({ aoTocar }) => {
-  const { oficinaAtiva, usuario } = useAuth();
+  const { oficinaAtiva, usuario, logoUrl } = useAuth();
   const nomeOficina = oficinaAtiva?.nome || usuario?.empresa || 'Minha Oficina';
 
   return (
@@ -35,7 +42,12 @@ const HeaderOficinaComLogo: React.FC<HeaderOficinaComLogoProps> = ({ aoTocar }) 
       onPress={aoTocar}
       activeOpacity={aoTocar ? 0.7 : 1}
     >
-      <AutoFLogo tamanho="mini" mostrarTexto={false} orientacao="horizontal" />
+      <ImagemAutenticada
+        caminhoRelativo={logoUrl}
+        style={styles.headerLogoOficina}
+        resizeMode="contain"
+        fallback={<AutoFLogo tamanho="mini" mostrarTexto={false} orientacao="horizontal" />}
+      />
       <View style={styles.headerOficinaTextoWrapper}>
         <Text style={styles.headerOficinaTexto} numberOfLines={1} ellipsizeMode="tail">
           {nomeOficina}
@@ -55,8 +67,33 @@ const HeaderOficinaComLogo: React.FC<HeaderOficinaComLogoProps> = ({ aoTocar }) 
 
 const AbasPrincipais = () => {
   const insets = useSafeAreaInsets();
-  const { logout } = useAuth();
+  const navigation = useNavigation<any>();
+  const { logout, hardwareBiometrico, biometriaAtiva, biometriaDispensada } = useAuth();
   const [modalTrocarOficinaVisivel, setModalTrocarOficinaVisivel] = useState(false);
+  const [modalBiometriaVisivel, setModalBiometriaVisivel] = useState(false);
+  const [modalMenuSanduicheVisivel, setModalMenuSanduicheVisivel] = useState(false);
+  const [modalHubCadastrosVisivel, setModalHubCadastrosVisivel] = useState(false);
+  const [modalClienteVisivel, setModalClienteVisivel] = useState(false);
+  const [modalVeiculoVisivel, setModalVeiculoVisivel] = useState(false);
+  const [modalServicoVisivel, setModalServicoVisivel] = useState(false);
+  const popUpDisparadoRef = React.useRef(false);
+
+  React.useEffect(() => {
+    // Se o usuário desativou no Perfil ou dispensou, garante que o pop-up NUNCA seja aberto
+    if (biometriaAtiva || biometriaDispensada) {
+      setModalBiometriaVisivel(false);
+      return;
+    }
+
+    // Se o aparelho possui sensor biométrico e ainda não foi ativado nem dispensado, exibe o pop-up no acesso inicial
+    if (hardwareBiometrico && !biometriaAtiva && !biometriaDispensada && !popUpDisparadoRef.current) {
+      popUpDisparadoRef.current = true;
+      const timer = setTimeout(() => {
+        setModalBiometriaVisivel(true);
+      }, 700);
+      return () => clearTimeout(timer);
+    }
+  }, [hardwareBiometrico, biometriaAtiva, biometriaDispensada]);
 
   const handleConfirmarLogout = () => {
     Alert.alert(
@@ -89,41 +126,20 @@ const AbasPrincipais = () => {
           headerTintColor: CORES.texto,
           headerRight: () => (
             <View style={styles.headerAcoesContainer}>
+              {/* Botão Menu Sanduíche */}
               <TouchableOpacity
-                style={styles.botaoHeaderOficina}
-                onPress={() => setModalTrocarOficinaVisivel(true)}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 6 }}
-                accessibilityLabel="Trocar Oficina"
-              >
-                <Ionicons name="business-outline" size={18} color={CORES.primariaClara} />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.botaoHeaderSair}
-                onPress={handleConfirmarLogout}
+                style={styles.botaoHeaderMenuSanduiche}
+                onPress={() => setModalMenuSanduicheVisivel(true)}
                 hitSlop={{ top: 10, bottom: 10, left: 6, right: 10 }}
-                accessibilityLabel="Encerrar Sessão"
+                accessibilityLabel="Abrir Menu Lateral"
               >
-                <Ionicons name="log-out-outline" size={20} color={CORES.perigoTexto} />
+                <Ionicons name="menu" size={24} color={CORES.texto} />
               </TouchableOpacity>
             </View>
           ),
           tabBarHideOnKeyboard: true,
           tabBarStyle: {
-            backgroundColor: CORES.superficie,
-            borderTopColor: CORES.bordaSuave,
-            height: 60 + Math.max(insets.bottom, 12),
-            paddingBottom: Math.max(insets.bottom, 12),
-            paddingTop: 8,
-          },
-          tabBarActiveTintColor: CORES.primariaClara,
-          tabBarInactiveTintColor: CORES.textoMudo,
-          tabBarLabelStyle: {
-            fontSize: 11,
-            fontWeight: '700',
-          },
-          tabBarItemStyle: {
-            paddingVertical: 2,
+            display: 'none',
           },
         }}
       >
@@ -134,10 +150,6 @@ const AbasPrincipais = () => {
             headerTitle: () => (
               <HeaderOficinaComLogo aoTocar={() => setModalTrocarOficinaVisivel(true)} />
             ),
-            tabBarLabel: 'Pátio',
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="car-sport" size={size} color={color} />
-            ),
           }}
         />
         <Tab.Screen
@@ -145,40 +157,89 @@ const AbasPrincipais = () => {
           component={VendasScreen}
           options={{
             title: 'Vendas de Peças',
-            tabBarLabel: 'Vendas',
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="cart" size={size} color={color} />
-            ),
           }}
         />
         <Tab.Screen
           name="Estoque"
           component={EstoqueScreen}
           options={{
-            title: 'Consulta de Estoque',
-            tabBarLabel: 'Estoque',
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="search" size={size} color={color} />
-            ),
+            title: 'Consulta de Peças',
           }}
         />
         <Tab.Screen
           name="Perfil"
           component={PerfilScreen}
           options={{
-            title: 'Minha Oficina',
-            tabBarLabel: 'Oficina',
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="business" size={size} color={color} />
-            ),
+            title: 'Meu Perfil',
           }}
         />
       </Tab.Navigator>
+
+      
+      {/* Modal Menu Sanduíche Lateral */}
+      <ModalMenuSanduiche
+        visivel={modalMenuSanduicheVisivel}
+        aoFechar={() => setModalMenuSanduicheVisivel(false)}
+        aoAbrirCadastros={() => setModalHubCadastrosVisivel(true)}
+        aoAbrirNovoCliente={() => setModalClienteVisivel(true)}
+        aoAbrirNovoVeiculo={() => setModalVeiculoVisivel(true)}
+        aoAbrirNovoServico={() => setModalServicoVisivel(true)}
+        aoAbrirTrocarOficina={() => setModalTrocarOficinaVisivel(true)}
+        aoNavegarPara={(tela) => {
+          navigation.navigate(tela);
+        }}
+      />
+
+      {/* Modal Central de Cadastros Rápidos */}
+      <ModalHubCadastros
+        visivel={modalHubCadastrosVisivel}
+        aoFechar={() => setModalHubCadastrosVisivel(false)}
+        aoClienteCriado={(cli) => {
+          Alert.alert('Sucesso', `Cliente "${cli.nome}" cadastrado com sucesso!`);
+        }}
+        aoVeiculoCriado={(veic) => {
+          Alert.alert('Sucesso', `Veículo placa ${veic.placa} cadastrado com sucesso!`);
+        }}
+        aoServicoCriado={(srv) => {
+          Alert.alert('Sucesso', `Serviço "${srv.nome}" cadastrado com sucesso!`);
+        }}
+      />
+
+      {/* Modais Diretos dos Cadastros */}
+      <ModalCadastroCliente
+        visivel={modalClienteVisivel}
+        aoFechar={() => setModalClienteVisivel(false)}
+        aoSalvar={(cli) => {
+          Alert.alert('Sucesso', `Cliente "${cli.nome}" cadastrado com sucesso!`);
+        }}
+      />
+
+      <ModalCadastroVeiculo
+        visivel={modalVeiculoVisivel}
+        aoFechar={() => setModalVeiculoVisivel(false)}
+        aoSalvar={(veic) => {
+          Alert.alert('Sucesso', `Veículo placa ${veic.placa} cadastrado com sucesso!`);
+        }}
+      />
+
+      <ModalCadastroServico
+        visivel={modalServicoVisivel}
+        aoFechar={() => setModalServicoVisivel(false)}
+        aoSalvar={(srv) => {
+          Alert.alert('Sucesso', `Serviço "${srv.nome}" cadastrado com sucesso!`);
+        }}
+      />
 
       {/* Modal Rápido de Troca de Oficina e Logout */}
       <ModalTrocarOficina
         visivel={modalTrocarOficinaVisivel}
         aoFechar={() => setModalTrocarOficinaVisivel(false)}
+      />
+
+      {/* Pop-up Amigável de Ativação de Biometria no Acesso */}
+      <ModalAtivacaoBiometria
+        visivel={modalBiometriaVisivel}
+        aoFechar={() => setModalBiometriaVisivel(false)}
       />
     </>
   );
@@ -241,6 +302,12 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingRight: 6,
   },
+  headerLogoOficina: {
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  },
   headerOficinaTextoWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -255,6 +322,24 @@ const styles = StyleSheet.create({
   },
   headerOficinaChevron: {
     marginLeft: 4,
+  },
+    botaoHeaderMenuSanduiche: {
+    padding: 6,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  abaCentralIconeBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F59E0B',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 3,
+    elevation: 4,
   },
   headerAcoesContainer: {
     flexDirection: 'row',

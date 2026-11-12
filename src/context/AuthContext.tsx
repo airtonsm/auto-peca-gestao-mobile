@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { Alert } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import {
   UsuarioMe,
@@ -14,7 +15,17 @@ import {
   extrairMensagemErro,
 } from '../api/clienteHttp';
 import { authApi } from '../api/authApi';
+import { identidadeApi } from '../api/identidadeApi';
 import { CONFIG_STORAGE_KEYS } from '../constants';
+import {
+  TipoBiometria,
+  verificarSuporteBiometria,
+  salvarCredencialBiometria,
+  obterCredencialBiometria,
+  removerCredencialBiometria,
+  executarLeituraBiometrica,
+  obterRotuloBiometria,
+} from '../utils/biometriaLoginHelper';
 
 interface AuthContextData {
   usuario: UsuarioMe | null;
@@ -25,18 +36,48 @@ interface AuthContextData {
   carregando: boolean;
   servidorUrl: string;
   precisaEscolherOficina: boolean;
-  login: (email: string, senha: string, oficinaId?: string) => Promise<{
+  logoUrl: string | null;
+  fotoUrl: string | null;
+  // Estados de Biometria
+  biometriaDisponivel: boolean;
+  hardwareBiometrico: boolean;
+  biometriaCadastrada: boolean;
+  biometriaAtiva: boolean;
+  biometriaDispensada: boolean;
+  tipoBiometria: TipoBiometria;
+  rotuloBiometria: string;
+  ultimoUsuarioBiometria: { email: string; nome: string } | null;
+  temSenhaEmMemoria: boolean;
+  // Métodos de Autenticação e Biometria
+  login: (
+    email: string,
+    senha: string,
+    oficinaId?: string,
+    adiarFinalizacao?: boolean
+  ) => Promise<{
     sucesso: boolean;
     precisaEscolherOficina?: boolean;
     oficinas?: OficinaDaSessao[];
     mensagem?: string;
+    resposta?: RespostaLogin;
   }>;
+  concluirLogin: (resposta: RespostaLogin, senhaUtilizada?: string) => Promise<void>;
+  loginComBiometria: () => Promise<{ sucesso: boolean; mensagem?: string }>;
+  ativarBiometria: (
+    ativar: boolean,
+    senhaOpcional?: string,
+    emailOpcional?: string,
+    nomeOpcional?: string
+  ) => Promise<boolean>;
+  dispensarBiometria: () => Promise<void>;
+  recarregarEstadoBiometria: () => Promise<void>;
   selecionarOficinaNoLogin: (oficinaId: string) => Promise<{ sucesso: boolean; mensagem?: string }>;
   cancelarEscolhaOficina: () => void;
   trocarOficina: (oficinaId: string) => Promise<boolean>;
   logout: () => Promise<void>;
   atualizarServidorUrl: (novaUrl: string) => Promise<void>;
   recarregarUsuario: () => Promise<void>;
+  recarregarIdentidadeVisual: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextData>({} as AuthContextData);
@@ -49,16 +90,97 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [carregando, setCarregando] = useState<boolean>(true);
   const [servidorUrl, setServidorUrl] = useState<string>(obterBaseUrlAtual());
   const [precisaEscolherOficina, setPrecisaEscolherOficina] = useState<boolean>(false);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [fotoUrl, setFotoUrl] = useState<string | null>(null);
   const [credenciaisTemporarias, setCredenciaisTemporarias] = useState<{
     email: string;
     senha: string;
   } | null>(null);
+
+  // Estados Biométricos
+  const [biometriaDisponivel, setBiometriaDisponivel] = useState<boolean>(false);
+  const [hardwareBiometrico, setHardwareBiometrico] = useState<boolean>(false);
+  const [biometriaCadastrada, setBiometriaCadastrada] = useState<boolean>(false);
+  const [biometriaAtiva, setBiometriaAtiva] = useState<boolean>(false);
+  const [biometriaDispensada, setBiometriaDispensada] = useState<boolean>(false);
+  const [tipoBiometria, setTipoBiometria] = useState<TipoBiometria>('OUTRO');
+  const [ultimoUsuarioBiometria, setUltimoUsuarioBiometria] = useState<{
+    email: string;
+    nome: string;
+  } | null>(null);
+
+  // Mantém a senha na memória volátil durante a sessão ativa (nunca exposta em storage inseguro)
+  const senhaEmMemoriaRef = useRef<string | null>(null);
+  const emailEmMemoriaRef = useRef<string | null>(null);
+  const nomeEmMemoriaRef = useRef<string | null>(null);
+
+  const rotuloBiometria = obterRotuloBiometria(tipoBiometria);
+
+  /**
+   * Recarrega o estado de compatibilidade e ativação da biometria no aparelho.
+   */
+  const recarregarEstadoBiometria = async () => {
+    try {
+      const suporte = await verificarSuporteBiometria();
+      console.log('[Biometria] Suporte retornado:', JSON.stringify(suporte));
+      const disponivel = suporte.compativel && suporte.cadastrado;
+      setHardwareBiometrico(suporte.compativel);
+      setBiometriaCadastrada(suporte.cadastrado);
+      setBiometriaDisponivel(disponivel);
+      setTipoBiometria(suporte.tipo);
+
+      const credSalva = await obterCredencialBiometria();
+      console.log('[Biometria] Credencial salva no SecureStore:', !!credSalva);
+      if (credSalva) {
+        setBiometriaAtiva(true);
+        setUltimoUsuarioBiometria({
+          email: credSalva.email,
+          nome: credSalva.nome,
+        });
+      } else {
+        setBiometriaAtiva(false);
+        setUltimoUsuarioBiometria(null);
+      }
+
+      const dispensada = await SecureStore.getItemAsync(CONFIG_STORAGE_KEYS.BIOMETRIA_DISPENSADA);
+      setBiometriaDispensada(dispensada === 'true');
+    } catch (e) {
+      console.warn('[Biometria] Erro ao carregar suporte e credenciais:', e);
+    }
+  };
+
+  const carregarIdentidadeVisual = async () => {
+    try {
+      console.log('[Identidade] Iniciando carregamento de logo e foto...');
+      const [identidade, minhaFoto] = await Promise.all([
+        identidadeApi.obterIdentidade(),
+        identidadeApi.obterMinhaFoto(),
+      ]);
+
+      // Baixa os bytes autenticados com token e converte para Data URI (base64)
+      const [logoDataUri, fotoDataUri] = await Promise.all([
+        identidade?.logo?.url
+          ? identidadeApi.baixarImagemComoDataUri(identidade.logo.url)
+          : Promise.resolve(null),
+        minhaFoto?.url
+          ? identidadeApi.baixarImagemComoDataUri(minhaFoto.url)
+          : Promise.resolve(null),
+      ]);
+
+      setLogoUrl(logoDataUri || null);
+      setFotoUrl(fotoDataUri || null);
+    } catch (e) {
+      console.warn('[Identidade] Erro ao carregar identidade visual:', e);
+    }
+  };
 
   // Inicializa o contexto carregando dados salvos
   useEffect(() => {
     const inicializar = async () => {
       setCarregando(true);
       try {
+        await recarregarEstadoBiometria();
+
         const { token: tokenSalvo, baseUrl } = await carregarConfiguracoesSalvas();
         setServidorUrl(baseUrl);
 
@@ -103,6 +225,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 // ignora
               }
             }
+
+            await carregarIdentidadeVisual();
           } catch (e) {
             console.log('[Auth] Token existente inválido ou expirado, limpando sessão:', e);
             await logout();
@@ -125,12 +249,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (
     email: string,
     senha: string,
-    oficinaId?: string
+    oficinaId?: string,
+    adiarFinalizacao: boolean = false
   ): Promise<{
     sucesso: boolean;
     precisaEscolherOficina?: boolean;
     oficinas?: OficinaDaSessao[];
     mensagem?: string;
+    resposta?: RespostaLogin;
   }> => {
     try {
       const resposta: RespostaLogin = await authApi.login(email, senha, oficinaId);
@@ -144,13 +270,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           sucesso: false,
           precisaEscolherOficina: true,
           oficinas: resposta.oficinas,
+          resposta,
         };
       }
 
       if (resposta.tokenAcesso) {
+        senhaEmMemoriaRef.current = senha;
         setCredenciaisTemporarias(null);
+
+        // Se adiarFinalizacao for true, a tela de Login chamará concluirLogin após o diálogo biométrico
+        if (adiarFinalizacao) {
+          return {
+            sucesso: true,
+            resposta,
+          };
+        }
+
         await processarLoginSucesso(resposta);
-        return { sucesso: true };
+        return { sucesso: true, resposta };
       }
 
       setCredenciaisTemporarias(null);
@@ -164,6 +301,145 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         sucesso: false,
         mensagem: extrairMensagemErro(error),
       };
+    }
+  };
+
+  const concluirLogin = async (resposta: RespostaLogin, senhaUtilizada?: string) => {
+    if (senhaUtilizada) {
+      senhaEmMemoriaRef.current = senhaUtilizada;
+    }
+    await processarLoginSucesso(resposta);
+  };
+
+  const loginComBiometria = async (): Promise<{ sucesso: boolean; mensagem?: string }> => {
+    const credencialSalva = await obterCredencialBiometria();
+    if (!credencialSalva) {
+      return {
+        sucesso: false,
+        mensagem: 'Nenhuma credencial biométrica ativa encontrada neste dispositivo.',
+      };
+    }
+
+    const rotulo = obterRotuloBiometria(tipoBiometria);
+    const autenticado = await executarLeituraBiometrica(`Acessar oficina com ${rotulo}`);
+
+    if (!autenticado) {
+      return {
+        sucesso: false,
+        mensagem: 'Biometria não reconhecida ou cancelada pelo usuário.',
+      };
+    }
+
+    // Tenta autenticar na API com a credencial segura recuperada
+    try {
+      const resposta: RespostaLogin = await authApi.login(
+        credencialSalva.email,
+        credencialSalva.credencial
+      );
+
+      // Cenário Multi-Oficina
+      if (!resposta.tokenAcesso && resposta.oficinas && resposta.oficinas.length > 0) {
+        setOficinasDisponiveis(resposta.oficinas);
+        setPrecisaEscolherOficina(true);
+        setCredenciaisTemporarias({
+          email: credencialSalva.email,
+          senha: credencialSalva.credencial,
+        });
+        return {
+          sucesso: false,
+          mensagem: 'Selecione a oficina para continuar.',
+        };
+      }
+
+      if (resposta.tokenAcesso) {
+        senhaEmMemoriaRef.current = credencialSalva.credencial;
+        await processarLoginSucesso(resposta);
+        return { sucesso: true };
+      }
+
+      return {
+        sucesso: false,
+        mensagem: 'Não foi possível validar o acesso com a credencial salva.',
+      };
+    } catch (error) {
+      console.warn('[Biometria] Erro ao autenticar credencial biométrica:', error);
+      // Se a credencial falhou no backend (ex: senha mudou), limpa o SecureStore
+      await removerCredencialBiometria();
+      await recarregarEstadoBiometria();
+      return {
+        sucesso: false,
+        mensagem: 'Credenciais expiradas ou alteradas. Por favor, entre com sua senha.',
+      };
+    }
+  };
+
+  const ativarBiometria = async (
+    ativar: boolean,
+    senhaOpcional?: string,
+    emailOpcional?: string,
+    nomeOpcional?: string
+  ): Promise<boolean> => {
+    if (!ativar) {
+      await removerCredencialBiometria();
+      await SecureStore.setItemAsync(CONFIG_STORAGE_KEYS.BIOMETRIA_DISPENSADA, 'true');
+      setBiometriaDispensada(true);
+      await recarregarEstadoBiometria();
+      return true;
+    }
+
+    if (!biometriaDisponivel && !hardwareBiometrico) {
+      return false;
+    }
+
+    const rotulo = obterRotuloBiometria(tipoBiometria);
+    const confirmado = await executarLeituraBiometrica(
+      `Confirme com ${rotulo} para ativar o login biométrico`
+    );
+
+    if (!confirmado) {
+      return false;
+    }
+
+    const senha = senhaOpcional || senhaEmMemoriaRef.current;
+    const email =
+      emailOpcional ||
+      usuario?.email ||
+      emailEmMemoriaRef.current ||
+      ultimoUsuarioBiometria?.email;
+    const nome =
+      nomeOpcional ||
+      usuario?.nome ||
+      nomeEmMemoriaRef.current ||
+      ultimoUsuarioBiometria?.nome ||
+      email?.split('@')[0] ||
+      'Usuário';
+
+    if (!senha || !email) {
+      console.warn('[Biometria] Senha ou e-mail indisponível para salvar biometria.');
+      return false;
+    }
+
+    try {
+      await salvarCredencialBiometria(email, nome, senha);
+      await SecureStore.setItemAsync(CONFIG_STORAGE_KEYS.BIOMETRIA_DISPENSADA, 'false');
+      setBiometriaDispensada(false);
+      senhaEmMemoriaRef.current = senha;
+      emailEmMemoriaRef.current = email;
+      nomeEmMemoriaRef.current = nome;
+      await recarregarEstadoBiometria();
+      return true;
+    } catch (e) {
+      console.error('[Biometria] Falha ao ativar biometria:', e);
+      return false;
+    }
+  };
+
+  const dispensarBiometria = async (): Promise<void> => {
+    try {
+      await SecureStore.setItemAsync(CONFIG_STORAGE_KEYS.BIOMETRIA_DISPENSADA, 'true');
+      setBiometriaDispensada(true);
+    } catch (e) {
+      console.warn('[Biometria] Erro ao salvar dispensa de biometria:', e);
     }
   };
 
@@ -243,8 +519,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       );
     }
 
+    const emailFinal = me?.email || resposta.usuario?.email || '';
+    const nomeFinal = me?.nome || resposta.usuario?.nome || emailFinal.split('@')[0] || 'Usuário';
+    if (emailFinal) emailEmMemoriaRef.current = emailFinal;
+    if (nomeFinal) nomeEmMemoriaRef.current = nomeFinal;
+
     setPrecisaEscolherOficina(false);
     setCredenciaisTemporarias(null);
+    await carregarIdentidadeVisual();
   };
 
   const trocarOficina = async (novaOficinaId: string): Promise<boolean> => {
@@ -252,6 +534,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const resposta = await authApi.trocarOficina(novaOficinaId);
       if (resposta.tokenAcesso) {
         await processarLoginSucesso(resposta);
+        await carregarIdentidadeVisual();
         return true;
       }
       return false;
@@ -268,6 +551,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setOficinasDisponiveis([]);
     setPrecisaEscolherOficina(false);
     setCredenciaisTemporarias(null);
+    setLogoUrl(null);
+    setFotoUrl(null);
+    senhaEmMemoriaRef.current = null;
 
     await definirTokenAutenticacao(null);
     try {
@@ -277,6 +563,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (e) {
       // ignora
     }
+
+    // Mantém as credenciais biométricas seguras para o próximo login,
+    // atualizando os estados da tela de login
+    await recarregarEstadoBiometria();
   };
 
   const atualizarServidorUrl = async (novaUrl: string) => {
@@ -316,13 +606,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         carregando,
         servidorUrl,
         precisaEscolherOficina,
+        logoUrl,
+        fotoUrl,
+        biometriaDisponivel,
+        hardwareBiometrico,
+        biometriaCadastrada,
+        biometriaAtiva,
+        biometriaDispensada,
+        tipoBiometria,
+        rotuloBiometria,
+        ultimoUsuarioBiometria,
+        temSenhaEmMemoria: !!senhaEmMemoriaRef.current,
         login,
+        concluirLogin,
+        loginComBiometria,
+        ativarBiometria,
+        dispensarBiometria,
+        recarregarEstadoBiometria,
         selecionarOficinaNoLogin,
         cancelarEscolhaOficina,
         trocarOficina,
         logout,
         atualizarServidorUrl,
         recarregarUsuario,
+        recarregarIdentidadeVisual: carregarIdentidadeVisual,
       }}
     >
       {children}

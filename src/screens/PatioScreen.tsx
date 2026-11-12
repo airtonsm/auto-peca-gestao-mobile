@@ -10,6 +10,7 @@ import {
   RefreshControl,
   Modal,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -28,6 +29,11 @@ import { ModalEnviarWhatsAppChecklist } from '../components/ModalEnviarWhatsAppC
 import { ModalMudarStatusOS } from '../components/ModalMudarStatusOS';
 import { ModalNovaOS } from '../components/ModalNovaOS';
 import { ModalImprimirOS } from '../components/ModalImprimirOS';
+import { ModalDetalheOS } from '../components/ModalDetalheOS';
+import { ModalHubCadastros } from '../components/ModalHubCadastros';
+import { ModalCadastroCliente } from '../components/ModalCadastroCliente';
+import { ModalCadastroVeiculo } from '../components/ModalCadastroVeiculo';
+import { ModalCadastroServico } from '../components/ModalCadastroServico';
 import {
   normalizarChaveStatus,
   obterProximoPassoRecomendado,
@@ -79,6 +85,19 @@ export const PatioScreen: React.FC = () => {
 
   // Modal para abertura de Nova Ordem de Serviço
   const [modalNovaOSVisivel, setModalNovaOSVisivel] = useState(false);
+  const [modalHubCadastrosVisivel, setModalHubCadastrosVisivel] = useState(false);
+  const [modalClienteVisivel, setModalClienteVisivel] = useState(false);
+  const [modalVeiculoVisivel, setModalVeiculoVisivel] = useState(false);
+  const [modalServicoVisivel, setModalServicoVisivel] = useState(false);
+
+  // Modal para Visualização Ampla e Completa dos Detalhes da OS
+  const [modalDetalheOSVisivel, setModalDetalheOSVisivel] = useState(false);
+  const [osDetalheId, setOsDetalheId] = useState<string | null>(null);
+
+  const abrirDetalheOS = (id: string) => {
+    setOsDetalheId(id);
+    setModalDetalheOSVisivel(true);
+  };
 
   // Modal para Impressão da OS e Envio pelo WhatsApp
   const [modalImprimirOSVisivel, setModalImprimirOSVisivel] = useState(false);
@@ -94,6 +113,8 @@ export const PatioScreen: React.FC = () => {
   const handleOSCriadaComSucesso = (novaOS: RespostaOSResumo) => {
     setOrdens((prev) => [novaOS, ...prev]);
     carregarOS();
+    // Abre a visualização ampla da OS criada automaticamente
+    abrirDetalheOS(novaOS.id);
   };
 
   const handleIniciarChecklistAposCriar = (novaOS: RespostaOSResumo) => {
@@ -274,7 +295,11 @@ export const PatioScreen: React.FC = () => {
     const proximoPasso = obterProximoPassoRecomendado(item.status);
 
     return (
-      <View style={styles.cardOS}>
+      <TouchableOpacity
+        style={styles.cardOS}
+        activeOpacity={0.88}
+        onPress={() => abrirDetalheOS(item.id)}
+      >
         {/* Cabeçalho do Card: Placa, Número da OS e Status Clicável */}
         <View style={styles.cardHeader}>
           <View style={styles.cardHeaderEsquerda}>
@@ -482,50 +507,42 @@ export const PatioScreen: React.FC = () => {
             </View>
           </TouchableOpacity>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
-  return (
-    <View style={styles.container}>
-      {/* Barra de Busca de OS e Ações Rápidas (Nova OS e Estoque) */}
+  const renderListHeader = () => (
+    <View style={styles.topoListaContainer}>
       <View style={styles.topoSecao}>
+        {/* Linha 1: Título e Ações Principais (Estoque e Nova OS) */}
         <View style={styles.cabecalhoAcoesPatio}>
           <View style={styles.cabecalhoTituloCol}>
-            <Text style={styles.cabecalhoTituloTexto}>Ordens de Serviço</Text>
+            <Text style={styles.cabecalhoTituloTexto}>Pátio da Oficina</Text>
             <Text style={styles.cabecalhoContadorTexto}>
-              {ordens.length} {ordens.length === 1 ? 'OS aberta' : 'OSs abertas'}
+              {ordens.length} {ordens.length === 1 ? 'veículo em atendimento' : 'veículos em atendimento'}
             </Text>
           </View>
 
           <View style={styles.cabecalhoBotoesLinha}>
-            {/* Botão Atalho para Consultar Estoque diretamente */}
-            <TouchableOpacity
-              style={styles.botaoAtalhoConsultaEstoque}
-              onPress={() => navigation.navigate('Estoque')}
-              accessibilityLabel="Consultar estoque de peças"
-            >
-              <Ionicons name="cube-outline" size={16} color="#38BDF8" />
-              <Text style={styles.botaoAtalhoConsultaEstoqueTexto}>Estoque</Text>
-            </TouchableOpacity>
-
             {/* Botão + Nova OS */}
             <TouchableOpacity
               style={styles.botaoNovaOS}
               onPress={() => setModalNovaOSVisivel(true)}
               accessibilityLabel="Abrir nova ordem de serviço"
-              activeOpacity={0.8}
+              activeOpacity={0.85}
             >
-              <Ionicons name="add-circle" size={18} color="#FFFFFF" />
+              <Ionicons name="add-circle" size={17} color="#FFFFFF" />
               <Text style={styles.botaoNovaOSTexto}>Nova OS</Text>
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Linha de Busca de OS por Placa ou Cliente */}
+
+
+        {/* Linha 3: Barra de Busca de OS por Placa ou Cliente */}
         <View style={styles.linhaBusca}>
           <View style={styles.inputBuscaContainer}>
-            <Ionicons name="search" size={20} color={CORES.textoMudo} style={styles.iconeBusca} />
+            <Ionicons name="search" size={18} color={CORES.textoMudo} style={styles.iconeBusca} />
             <TextInput
               style={styles.inputBusca}
               placeholder="Buscar por placa, cliente ou veículo..."
@@ -541,7 +558,7 @@ export const PatioScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* Pills de Filtro por Status */}
+        {/* Linha 4: Pills de Filtro por Status */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -574,7 +591,11 @@ export const PatioScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
       )}
+    </View>
+  );
 
+  return (
+    <View style={styles.container}>
       {/* Lista de Ordens de Serviço */}
       {carregando && !recarregando ? (
         <View style={styles.loadingContainer}>
@@ -586,7 +607,8 @@ export const PatioScreen: React.FC = () => {
           data={ordensFiltradas}
           keyExtractor={(item) => item.id}
           renderItem={renderCardOS}
-          contentContainerStyle={[styles.listaConteudo, { paddingBottom: insets.bottom + 80 }]}
+          ListHeaderComponent={renderListHeader}
+          contentContainerStyle={[styles.listaConteudo, { paddingBottom: insets.bottom + 90 }]}
           refreshControl={
             <RefreshControl
               refreshing={recarregando}
@@ -597,13 +619,26 @@ export const PatioScreen: React.FC = () => {
           }
           ListEmptyComponent={
             <View style={styles.vazioContainer}>
-              <Ionicons name="car-sport-outline" size={64} color={CORES.borda} />
-              <Text style={styles.vazioTitulo}>Nenhum veículo encontrado</Text>
+              <View style={styles.vazioIconeBox}>
+                <Ionicons name="car-sport-outline" size={44} color={CORES.primariaClara} />
+              </View>
+              <Text style={styles.vazioTitulo}>Pátio Livre no Momento</Text>
               <Text style={styles.vazioSubtitulo}>
                 {termoBusca || filtroStatus !== 'todos'
                   ? 'Não há ordens de serviço correspondentes aos filtros aplicados.'
-                  : 'Nenhum veículo em atendimento aberto no pátio no momento.'}
+                  : 'Cadastre clientes, veículos ou serviços para iniciar atendimentos ou abra uma nova OS.'}
               </Text>
+
+              <View style={styles.vazioBotoesAcao}>
+                <TouchableOpacity
+                  style={styles.vazioBotaoNovaOS}
+                  onPress={() => setModalNovaOSVisivel(true)}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="add-circle" size={18} color="#FFFFFF" />
+                  <Text style={styles.vazioBotaoNovaOSTexto}>+ Abrir Nova Ordem de Serviço</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           }
         />
@@ -654,15 +689,61 @@ export const PatioScreen: React.FC = () => {
         aoSolicitarRecarregar={carregarOS}
       />
 
-      {/* Botão Flutuante (FAB) para Abertura Rápida de Nova OS */}
-      <TouchableOpacity
-        style={[styles.fabNovaOS, { bottom: insets.bottom + 16 }]}
-        onPress={() => setModalNovaOSVisivel(true)}
-        activeOpacity={0.85}
-        accessibilityLabel="Abrir nova Ordem de Serviço"
-      >
-        <Ionicons name="add" size={30} color="#FFFFFF" />
-      </TouchableOpacity>
+      {/* Modal de Detalhe Amplo da OS */}
+      <ModalDetalheOS
+        visivel={modalDetalheOSVisivel}
+        osId={osDetalheId}
+        aoFechar={() => {
+          setModalDetalheOSVisivel(false);
+          setOsDetalheId(null);
+        }}
+        aoAtualizar={carregarOS}
+        aoAbrirChecklist={(os, tipo) => iniciarChecklist(os, tipo)}
+        aoAbrirPecas={(os) => abrirModalPecas(os)}
+        aoAbrirMudarStatus={(os) => abrirModalMudarStatus(os)}
+        aoAbrirImprimir={(os) => abrirModalImprimirOS(os)}
+        aoVerDetalhesChecklist={(os, chks) => {
+          setOsHistoricoSelecionada(os);
+          setHistoricoChecklists(chks);
+          setModalChecklistsVisivel(true);
+        }}
+      />
+
+            
+
+      
+
+
+      {/* Modal Central de Cadastros Rápidos */}
+      <ModalHubCadastros
+        visivel={modalHubCadastrosVisivel}
+        aoFechar={() => setModalHubCadastrosVisivel(false)}
+      />
+
+      {/* Modais Individuais Diretos */}
+      <ModalCadastroCliente
+        visivel={modalClienteVisivel}
+        aoFechar={() => setModalClienteVisivel(false)}
+        aoSalvar={(cli) => {
+          Alert.alert('Sucesso', `Cliente "${cli.nome}" cadastrado com sucesso!`);
+        }}
+      />
+
+      <ModalCadastroVeiculo
+        visivel={modalVeiculoVisivel}
+        aoFechar={() => setModalVeiculoVisivel(false)}
+        aoSalvar={(veic) => {
+          Alert.alert('Sucesso', `Veículo placa ${veic.placa} cadastrado com sucesso!`);
+        }}
+      />
+
+      <ModalCadastroServico
+        visivel={modalServicoVisivel}
+        aoFechar={() => setModalServicoVisivel(false)}
+        aoSalvar={(srv) => {
+          Alert.alert('Sucesso', `Serviço "${srv.nome}" cadastrado com sucesso!`);
+        }}
+      />
 
       {/* Modal de Abertura de Nova OS */}
       <ModalNovaOS
@@ -687,6 +768,115 @@ export const PatioScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+    containerAtalhosRapidos: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 10,
+  },
+  scrollAtalhosRapidos: {
+    gap: 8,
+    alignItems: 'center',
+  },
+  chipCadastrosHub: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.4)',
+  },
+  chipCadastrosHubTexto: {
+    color: '#F59E0B',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  chipAtalhoRapido: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    borderRadius: 8,
+    backgroundColor: CORES.superficieClara,
+    borderWidth: 1,
+    borderColor: CORES.bordaSuave,
+  },
+  chipAtalhoRapidoTexto: {
+    color: CORES.texto,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  vazioIconeBox: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: 'rgba(37, 99, 235, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  vazioBotoesAcao: {
+    marginTop: 18,
+    gap: 10,
+    width: '100%',
+    paddingHorizontal: 20,
+  },
+  vazioBotaoCadastros: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(245, 158, 11, 0.18)',
+    borderWidth: 1.5,
+    borderColor: '#F59E0B',
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  vazioBotaoCadastrosTexto: {
+    color: '#F59E0B',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  vazioBotaoNovaOS: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: CORES.primaria,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  vazioBotaoNovaOSTexto: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  fabCadastros: {
+    position: 'absolute',
+    right: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#F59E0B',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 5,
+    elevation: 8,
+    zIndex: 999,
+  },
+  fabCadastrosTexto: {
+    color: '#0F172A',
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0.3,
+  },
   container: {
     flex: 1,
     backgroundColor: CORES.fundo,
@@ -737,6 +927,22 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
   },
+    botaoAtalhoCadastros: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 8,
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.35)',
+  },
+  botaoAtalhoCadastrosTexto: {
+    color: '#F59E0B',
+    fontSize: 12,
+    fontWeight: '700',
+  },
   botaoAtalhoConsultaEstoque: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -766,21 +972,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     height: 44,
   },
-  fabNovaOS: {
-    position: 'absolute',
-    right: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#2563EB',
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 5,
-    zIndex: 99,
+  topoListaContainer: {
+    marginBottom: 8,
   },
   iconeBusca: {
     marginRight: 8,

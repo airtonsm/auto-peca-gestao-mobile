@@ -7,15 +7,19 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  Switch,
+  Modal,
+  TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { CORES } from '../constants';
 import { extrairMensagemErro } from '../api/clienteHttp';
-import { ConfiguradorServidorModal } from '../components/ConfiguradorServidorModal';
+import { ImagemAutenticada } from '../components/ImagemAutenticada';
 import { ModalTrocarOficina } from '../components/ModalTrocarOficina';
-import { authApi } from '../api/authApi';
+import { ModalHubCadastros } from '../components/ModalHubCadastros';
+import { obterIconeBiometria } from '../utils/biometriaLoginHelper';
 
 export const PerfilScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -25,13 +29,29 @@ export const PerfilScreen: React.FC = () => {
     oficinasDisponiveis,
     trocarOficina,
     logout,
-    servidorUrl,
+    logoUrl,
+    fotoUrl,
+    biometriaDisponivel,
+    hardwareBiometrico,
+    biometriaCadastrada,
+    biometriaAtiva,
+    tipoBiometria,
+    rotuloBiometria,
+    ultimoUsuarioBiometria,
+    temSenhaEmMemoria,
+    ativarBiometria,
   } = useAuth();
 
   const [trocandoOficina, setTrocandoOficina] = useState<string | null>(null);
   const [modalTrocarOficinaVisivel, setModalTrocarOficinaVisivel] = useState(false);
-  const [modalServidorVisivel, setModalServidorVisivel] = useState(false);
-  const [testandoSaude, setTestandoSaude] = useState(false);
+  const [modalHubCadastrosVisivel, setModalHubCadastrosVisivel] = useState(false);
+
+  // Estados para controle do switch e ativação biométrica
+  const [alternandoBiometria, setAlternandoBiometria] = useState(false);
+  const [modalSenhaVisivel, setModalSenhaVisivel] = useState(false);
+  const [senhaDigitada, setSenhaDigitada] = useState('');
+  const [ocultarSenha, setOcultarSenha] = useState(true);
+  const [erroSenha, setErroSenha] = useState<string | null>(null);
 
   const handleTrocarOficina = async (oficinaId: string, nomeOficina: string) => {
     if (oficinaId === oficinaAtiva?.id) return;
@@ -59,21 +79,6 @@ export const PerfilScreen: React.FC = () => {
     );
   };
 
-  const testarSaudeServidor = async () => {
-    setTestandoSaude(true);
-    try {
-      const resp = await authApi.testarConexao();
-      Alert.alert(
-        'Servidor Online',
-        `Conexão bem-sucedida com a API.\nVersão do Backend: ${resp.versao || '1.0'}\nStatus: ${resp.status}`
-      );
-    } catch (e) {
-      Alert.alert('Falha na Conexão', extrairMensagemErro(e));
-    } finally {
-      setTestandoSaude(false);
-    }
-  };
-
   const handleLogout = () => {
     Alert.alert(
       'Sair da Conta',
@@ -89,15 +94,107 @@ export const PerfilScreen: React.FC = () => {
     );
   };
 
+  const handleToggleBiometria = async (novoValor: boolean) => {
+    if (!novoValor) {
+      // Confirmação para desativar biometria
+      Alert.alert(
+        'Desativar Biometria',
+        `Deseja desativar o acesso por ${rotuloBiometria} neste aparelho?`,
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          {
+            text: 'Desativar',
+            style: 'destructive',
+            onPress: async () => {
+              setAlternandoBiometria(true);
+              try {
+                await ativarBiometria(false);
+                Alert.alert('Biometria Desativada', 'O acesso biométrico foi desativado com sucesso.');
+              } catch (e) {
+                Alert.alert('Erro', 'Não foi possível desativar a biometria.');
+              } finally {
+                setAlternandoBiometria(false);
+              }
+            },
+          },
+        ]
+      );
+      return;
+    }
+
+    // Caso o usuário queira ativar:
+    if (!biometriaCadastrada && hardwareBiometrico) {
+      Alert.alert(
+        'Biometria Não Cadastrada',
+        `O smartphone possui sensor, mas nenhuma impressão digital ou face foi cadastrada no sistema operacional. Cadastre sua biometria nas Configurações do aparelho antes de ativar.`
+      );
+      return;
+    }
+
+    if (temSenhaEmMemoria) {
+      // Temos a credencial da sessão em memória -> dispara direto a confirmação biométrica
+      setAlternandoBiometria(true);
+      try {
+        const sucesso = await ativarBiometria(true);
+        if (sucesso) {
+          Alert.alert('Sucesso', `Login por ${rotuloBiometria} ativado com sucesso!`);
+        } else {
+          Alert.alert('Não ativado', `A leitura de ${rotuloBiometria} não foi confirmada.`);
+        }
+      } catch (e) {
+        Alert.alert('Erro', 'Ocorreu um erro ao registrar a biometria.');
+      } finally {
+        setAlternandoBiometria(false);
+      }
+    } else {
+      // Se não temos a senha em memória (ex: sessão persistida de login antigo), pede a senha para salvar no SecureStore
+      setSenhaDigitada('');
+      setErroSenha(null);
+      setModalSenhaVisivel(true);
+    }
+  };
+
+  const handleConfirmarSenhaParaBiometria = async () => {
+    if (!senhaDigitada.trim()) {
+      setErroSenha('Digite sua senha para confirmar a ativação.');
+      return;
+    }
+
+    setAlternandoBiometria(true);
+    setErroSenha(null);
+    try {
+      const sucesso = await ativarBiometria(true, senhaDigitada);
+      if (sucesso) {
+        setModalSenhaVisivel(false);
+        Alert.alert('Sucesso', `Login por ${rotuloBiometria} ativado com sucesso!`);
+      } else {
+        setErroSenha(`A confirmação de ${rotuloBiometria} falhou ou foi cancelada.`);
+      }
+    } catch (e) {
+      setErroSenha('Não foi possível ativar a biometria.');
+    } finally {
+      setAlternandoBiometria(false);
+    }
+  };
+
+  const iconeBiometria = obterIconeBiometria(tipoBiometria);
+
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 80 }]}>
         {/* Card do Usuário */}
         <View style={styles.cardUsuario}>
           <View style={styles.avatarBox}>
-            <Text style={styles.avatarTexto}>
-              {(usuario?.nome || 'U').substring(0, 2).toUpperCase()}
-            </Text>
+            <ImagemAutenticada
+              caminhoRelativo={fotoUrl}
+              style={styles.avatarImagem}
+              resizeMode="cover"
+              fallback={
+                <Text style={styles.avatarTexto}>
+                  {(usuario?.nome || 'U').substring(0, 2).toUpperCase()}
+                </Text>
+              }
+            />
           </View>
 
           <View style={styles.usuarioInfo}>
@@ -132,6 +229,87 @@ export const PerfilScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
 
+                {/* ======================================================== */}
+        {/* SEÇÃO CADASTROS RÁPIDOS MOBILE (CLIENTE, VEÍCULO, SERVIÇO) */}
+        {/* ======================================================== */}
+        <View style={styles.secao}>
+          <View style={styles.secaoTituloLinha}>
+            <Ionicons name="flash" size={20} color="#F59E0B" />
+            <Text style={styles.secaoTitulo}>Cadastros Rápidos</Text>
+          </View>
+
+          <TouchableOpacity
+            style={styles.cardCadastrosRapidos}
+            activeOpacity={0.85}
+            onPress={() => setModalHubCadastrosVisivel(true)}
+          >
+            <View style={styles.cardCadastrosRapidosIconeBox}>
+              <Ionicons name="flash-outline" size={26} color="#F59E0B" />
+            </View>
+            <View style={styles.cardCadastrosRapidosTextos}>
+              <View style={styles.cardCadastrosRapidosTituloLinha}>
+                <Text style={styles.cardCadastrosRapidosTitulo}>Central de Cadastros Rápidos</Text>
+                <View style={styles.tagNovo}>
+                  <Text style={styles.tagNovoTexto}>Ágil</Text>
+                </View>
+              </View>
+              <Text style={styles.cardCadastrosRapidosSubtitulo}>
+                Cadastre clientes, veículos com placa Mercosul e serviços de mão de obra em menos de 30 segundos.
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={CORES.textoMudo} />
+          </TouchableOpacity>
+        </View>
+
+        {/* ======================================================== */}
+        {/* SEÇÃO SEGURANÇA & ACESSO (LOGIN POR BIOMETRIA)           */}
+        {/* ======================================================== */}
+        <View style={styles.secao}>
+          <View style={styles.secaoTituloLinha}>
+            <Ionicons name="shield-checkmark-outline" size={20} color={CORES.primariaClara} />
+            <Text style={styles.secaoTitulo}>Segurança & Acesso</Text>
+          </View>
+
+          {!hardwareBiometrico && !biometriaDisponivel ? (
+            <View style={styles.biometriaNaoDisponivelBox}>
+              <Ionicons name="information-circle-outline" size={18} color={CORES.textoMudo} />
+              <Text style={styles.biometriaNaoDisponivelTexto}>
+                Sensor biométrico não suportado neste aparelho.
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.itemBiometriaConfig}>
+              <View style={styles.iconeBiometriaConfigBox}>
+                <Ionicons name={iconeBiometria} size={24} color={CORES.primariaClara} />
+              </View>
+
+              <View style={styles.infoBiometriaConfig}>
+                <Text style={styles.tituloBiometriaConfig}>
+                  Login por {rotuloBiometria}
+                </Text>
+                <Text style={styles.subtituloBiometriaConfig}>
+                  {biometriaAtiva
+                    ? `Ativo para ${ultimoUsuarioBiometria?.email || usuario?.email}`
+                    : !biometriaCadastrada
+                    ? 'Biometria não cadastrada no SO'
+                    : `Acessar o aplicativo usando ${rotuloBiometria}`}
+                </Text>
+              </View>
+
+              {alternandoBiometria ? (
+                <ActivityIndicator size="small" color={CORES.primariaClara} />
+              ) : (
+                <Switch
+                  value={biometriaAtiva}
+                  onValueChange={handleToggleBiometria}
+                  trackColor={{ false: CORES.borda, true: CORES.primaria }}
+                  thumbColor={biometriaAtiva ? '#FFFFFF' : '#CBD5E1'}
+                />
+              )}
+            </View>
+          )}
+        </View>
+
         {/* Seção Mudar de Oficina (Multi-Tenant nativo) */}
         <View style={styles.secao}>
           <View style={styles.secaoTituloLinha}>
@@ -141,16 +319,30 @@ export const PerfilScreen: React.FC = () => {
 
           {/* Oficina Ativa Atual */}
           <View style={styles.oficinaAtivaCard}>
-            <View style={styles.oficinaAtivaTopo}>
-              <View style={styles.pontoAtivo} />
-              <Text style={styles.oficinaAtivaTag}>OFICINA EM OPERAÇÃO</Text>
+            <View style={styles.oficinaAtivaCabecalhoLinha}>
+              <ImagemAutenticada
+                caminhoRelativo={logoUrl}
+                style={styles.oficinaLogoCard}
+                resizeMode="contain"
+                fallback={
+                  <View style={styles.oficinaIconeCard}>
+                    <Ionicons name="business" size={24} color={CORES.primariaClara} />
+                  </View>
+                }
+              />
+              <View style={styles.oficinaAtivaDados}>
+                <View style={styles.oficinaAtivaTopo}>
+                  <View style={styles.pontoAtivo} />
+                  <Text style={styles.oficinaAtivaTag}>OFICINA EM OPERAÇÃO</Text>
+                </View>
+                <Text style={styles.oficinaAtivaNome}>
+                  {oficinaAtiva?.nome || usuario?.empresa || 'Oficina Principal'}
+                </Text>
+                <Text style={styles.oficinaAtivaId}>
+                  Tenant ID: {oficinaAtiva?.id || usuario?.tenantId || '---'}
+                </Text>
+              </View>
             </View>
-            <Text style={styles.oficinaAtivaNome}>
-              {oficinaAtiva?.nome || usuario?.empresa || 'Oficina Principal'}
-            </Text>
-            <Text style={styles.oficinaAtivaId}>
-              Tenant ID: {oficinaAtiva?.id || usuario?.tenantId || '---'}
-            </Text>
           </View>
 
           {/* Botão de Destaque para Trocar Oficina */}
@@ -222,46 +414,6 @@ export const PerfilScreen: React.FC = () => {
           )}
         </View>
 
-        {/* Seção Conexão de Rede & API */}
-        <View style={styles.secao}>
-          <View style={styles.secaoTituloLinha}>
-            <Ionicons name="wifi-outline" size={20} color={CORES.primariaClara} />
-            <Text style={styles.secaoTitulo}>Conectividade & Servidor</Text>
-          </View>
-
-          <View style={styles.servidorInfoCard}>
-            <View style={styles.servidorInfoLinha}>
-              <Text style={styles.servidorInfoLabel}>Endereço da API Backend:</Text>
-              <Text style={styles.servidorInfoUrl}>{servidorUrl}</Text>
-            </View>
-
-            <View style={styles.servidorBotoesLinha}>
-              <TouchableOpacity
-                style={styles.botaoTestarConexao}
-                onPress={testarSaudeServidor}
-                disabled={testandoSaude}
-              >
-                {testandoSaude ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <>
-                    <Ionicons name="pulse" size={16} color="#FFFFFF" />
-                    <Text style={styles.botaoTestarConexaoTexto}>Testar Conexão</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.botaoAlterarIp, !__DEV__ && { display: 'none' }]}
-                onPress={__DEV__ ? () => setModalServidorVisivel(true) : undefined}
-              >
-                <Ionicons name="settings-outline" size={16} color={CORES.texto} />
-                <Text style={styles.botaoAlterarIpTexto}>Mudar IP / Porta</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-
         {/* Botão de Logout */}
         <TouchableOpacity style={styles.botaoLogout} onPress={handleLogout}>
           <Ionicons name="log-out-outline" size={22} color={CORES.perigoTexto} />
@@ -270,9 +422,84 @@ export const PerfilScreen: React.FC = () => {
 
         {/* Informações de Versão */}
         <Text style={styles.versaoTexto}>
-          AutoF Sistema de Gestão Mobile v1.0.0 (Build Produção)
+          AutoF Sistema de Gestão Mobile v1.1.4 (Build Produção)
         </Text>
       </ScrollView>
+
+      {/* Modal para digitar a senha caso a biometria seja ativada sem senha em memória */}
+      <Modal
+        visible={modalSenhaVisivel}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setModalSenhaVisivel(false)}
+      >
+        <View style={styles.fundoModal}>
+          <View style={styles.cardModalSenha}>
+            <View style={styles.modalSenhaIconeBox}>
+              <Ionicons name={iconeBiometria} size={32} color={CORES.primariaClara} />
+            </View>
+
+            <Text style={styles.modalSenhaTitulo}>
+              Confirmar Ativação
+            </Text>
+
+            <Text style={styles.modalSenhaDescricao}>
+              Para habilitar o login por {rotuloBiometria}, confirme sua senha atual de acesso:
+            </Text>
+
+            {erroSenha && (
+              <View style={styles.modalErroBox}>
+                <Ionicons name="alert-circle" size={18} color={CORES.perigoTexto} />
+                <Text style={styles.modalErroTexto}>{erroSenha}</Text>
+              </View>
+            )}
+
+            <View style={styles.inputLinha}>
+              <Ionicons name="lock-closed-outline" size={20} color={CORES.textoMudo} style={styles.inputIcone} />
+              <TextInput
+                style={styles.input}
+                placeholder="Sua senha atual"
+                placeholderTextColor={CORES.textoMudo}
+                value={senhaDigitada}
+                onChangeText={setSenhaDigitada}
+                secureTextEntry={ocultarSenha}
+              />
+              <TouchableOpacity
+                onPress={() => setOcultarSenha(!ocultarSenha)}
+                style={styles.botaoOlho}
+              >
+                <Ionicons
+                  name={ocultarSenha ? 'eye-off-outline' : 'eye-outline'}
+                  size={20}
+                  color={CORES.textoMudo}
+                />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalBotoesLinha}>
+              <TouchableOpacity
+                style={styles.botaoModalCancelar}
+                onPress={() => setModalSenhaVisivel(false)}
+                disabled={alternandoBiometria}
+              >
+                <Text style={styles.botaoModalCancelarTexto}>Cancelar</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.botaoModalConfirmar}
+                onPress={handleConfirmarSenhaParaBiometria}
+                disabled={alternandoBiometria}
+              >
+                {alternandoBiometria ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.botaoModalConfirmarTexto}>Confirmar</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Modal Trocar Oficina */}
       <ModalTrocarOficina
@@ -280,10 +507,10 @@ export const PerfilScreen: React.FC = () => {
         aoFechar={() => setModalTrocarOficinaVisivel(false)}
       />
 
-      {/* Modal Configurador de Servidor */}
-      <ConfiguradorServidorModal
-        visivel={modalServidorVisivel}
-        aoFechar={() => setModalServidorVisivel(false)}
+      {/* Modal Central de Cadastros Rápidos */}
+      <ModalHubCadastros
+        visivel={modalHubCadastrosVisivel}
+        aoFechar={() => setModalHubCadastrosVisivel(false)}
       />
     </View>
   );
@@ -298,6 +525,54 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 40,
     gap: 16,
+  },
+    cardCadastrosRapidos: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: CORES.superficie,
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1.5,
+    borderColor: 'rgba(245, 158, 11, 0.35)',
+    gap: 14,
+  },
+  cardCadastrosRapidosIconeBox: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardCadastrosRapidosTextos: {
+    flex: 1,
+  },
+  cardCadastrosRapidosTituloLinha: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  cardCadastrosRapidosTitulo: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: CORES.texto,
+  },
+  tagNovo: {
+    backgroundColor: 'rgba(245, 158, 11, 0.2)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  tagNovoTexto: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#F59E0B',
+  },
+  cardCadastrosRapidosSubtitulo: {
+    fontSize: 12,
+    color: CORES.textoSecundario,
+    lineHeight: 16,
   },
   cardUsuario: {
     flexDirection: 'row',
@@ -369,6 +644,12 @@ const styles = StyleSheet.create({
     backgroundColor: CORES.primaria,
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
+  },
+  avatarImagem: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
   },
   avatarTexto: {
     color: '#FFFFFF',
@@ -423,12 +704,81 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
   },
+  itemBiometriaConfig: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: CORES.fundo,
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: CORES.borda,
+    gap: 12,
+  },
+  iconeBiometriaConfigBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: 'rgba(37, 99, 235, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  infoBiometriaConfig: {
+    flex: 1,
+  },
+  tituloBiometriaConfig: {
+    color: CORES.texto,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  subtituloBiometriaConfig: {
+    color: CORES.textoSecundario,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  biometriaNaoDisponivelBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: CORES.fundo,
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: CORES.bordaSuave,
+    gap: 10,
+  },
+  biometriaNaoDisponivelTexto: {
+    color: CORES.textoMudo,
+    fontSize: 12,
+    lineHeight: 16,
+    flex: 1,
+  },
   oficinaAtivaCard: {
     backgroundColor: CORES.fundo,
     borderRadius: 10,
     padding: 14,
     borderWidth: 1,
     borderColor: '#0284C7',
+  },
+  oficinaAtivaCabecalhoLinha: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  oficinaLogoCard: {
+    width: 48,
+    height: 48,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  oficinaIconeCard: {
+    width: 48,
+    height: 48,
+    borderRadius: 10,
+    backgroundColor: 'rgba(37, 99, 235, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  oficinaAtivaDados: {
+    flex: 1,
   },
   oficinaAtivaTopo: {
     flexDirection: 'row',
@@ -508,63 +858,6 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     flex: 1,
   },
-  servidorInfoCard: {
-    backgroundColor: CORES.fundo,
-    borderRadius: 10,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: CORES.bordaSuave,
-    gap: 12,
-  },
-  servidorInfoLinha: {
-    gap: 4,
-  },
-  servidorInfoLabel: {
-    color: CORES.textoMudo,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  servidorInfoUrl: {
-    color: '#38BDF8',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  servidorBotoesLinha: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  botaoTestarConexao: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: CORES.primaria,
-    paddingVertical: 10,
-    borderRadius: 8,
-    gap: 6,
-  },
-  botaoTestarConexaoTexto: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  botaoAlterarIp: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: CORES.superficieClara,
-    paddingVertical: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: CORES.borda,
-    gap: 6,
-  },
-  botaoAlterarIpTexto: {
-    color: CORES.texto,
-    fontSize: 13,
-    fontWeight: '700',
-  },
   botaoLogout: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -587,5 +880,115 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
     marginTop: 8,
+  },
+  fundoModal: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  cardModalSenha: {
+    width: '100%',
+    maxWidth: 380,
+    backgroundColor: CORES.superficie,
+    borderRadius: 18,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: CORES.bordaSuave,
+  },
+  modalSenhaIconeBox: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(37, 99, 235, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    alignSelf: 'center',
+    marginBottom: 14,
+  },
+  modalSenhaTitulo: {
+    color: CORES.texto,
+    fontSize: 18,
+    fontWeight: '800',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  modalSenhaDescricao: {
+    color: CORES.textoSecundario,
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 18,
+  },
+  modalErroBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: CORES.perigoFundo,
+    borderWidth: 1,
+    borderColor: CORES.perigo,
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 14,
+    gap: 8,
+  },
+  modalErroTexto: {
+    color: CORES.perigoTexto,
+    fontSize: 12,
+    flex: 1,
+  },
+  inputLinha: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: CORES.fundo,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: CORES.borda,
+    paddingHorizontal: 12,
+    marginBottom: 18,
+  },
+  inputIcone: {
+    marginRight: 8,
+  },
+  input: {
+    flex: 1,
+    height: 48,
+    color: CORES.texto,
+    fontSize: 15,
+  },
+  botaoOlho: {
+    padding: 6,
+  },
+  modalBotoesLinha: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 6,
+  },
+  botaoModalCancelar: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: CORES.borda,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  botaoModalCancelarTexto: {
+    color: CORES.textoSecundario,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  botaoModalConfirmar: {
+    flex: 1,
+    backgroundColor: CORES.primaria,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  botaoModalConfirmarTexto: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });

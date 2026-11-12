@@ -23,6 +23,8 @@ import {
 import { CORES } from '../constants';
 import { extrairMensagemErro } from '../api/clienteHttp';
 import { PlacaVeiculo } from './PlacaVeiculo';
+import { ModalCadastroVeiculo } from './ModalCadastroVeiculo';
+import { ModalCapturaFotoPlaca } from './ModalCapturaFotoPlaca';
 
 interface ModalNovaOSProps {
   visivel: boolean;
@@ -66,6 +68,8 @@ export const ModalNovaOS: React.FC<ModalNovaOSProps> = ({
   const [novoModelo, setNovoModelo] = useState('');
   const [novoClienteNome, setNovoClienteNome] = useState('');
   const [novoClienteTelefone, setNovoClienteTelefone] = useState('');
+  const [modalCadastroVeiculoVisivel, setModalCadastroVeiculoVisivel] = useState(false);
+  const [modalFotoPlacaVisivel, setModalFotoPlacaVisivel] = useState(false);
 
   // Estados do Atendimento da OS
   const [kmEntrada, setKmEntrada] = useState('');
@@ -129,9 +133,21 @@ export const ModalNovaOS: React.FC<ModalNovaOSProps> = ({
           setKmEntrada(String(v.kmAtual));
         }
       } else if (limpa.length >= 7) {
-        // Placa completa digitada e não achou
+        // Placa completa digitada e não achou na oficina: consulta base oficial veicular
         setVeiculoEncontrado(null);
         setVeiculoNaoEncontrado(true);
+        try {
+          const dadosOficiais = await osApi.consultarPlaca(limpa);
+          if (dadosOficiais?.encontrado && dadosOficiais?.veiculo) {
+            const v = dadosOficiais.veiculo;
+            const partes = [v.marca, v.modelo, v.versao, v.motor].filter(Boolean);
+            if (partes.length > 0) {
+              setNovoModelo(partes.join(' '));
+            }
+          }
+        } catch {
+          // segue para digitação manual
+        }
       } else {
         setVeiculoEncontrado(null);
         setVeiculoNaoEncontrado(false);
@@ -275,8 +291,9 @@ export const ModalNovaOS: React.FC<ModalNovaOSProps> = ({
   };
 
   return (
-    <Modal
-      visible={visivel}
+    <>
+      <Modal
+        visible={visivel}
       animationType="slide"
       transparent
       onRequestClose={handleFechar}
@@ -320,6 +337,14 @@ export const ModalNovaOS: React.FC<ModalNovaOSProps> = ({
                     autoCapitalize="characters"
                     maxLength={8}
                   />
+                  <TouchableOpacity
+                    style={styles.botaoCameraPlacaOS}
+                    onPress={() => setModalFotoPlacaVisivel(true)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    accessibilityLabel="Tirar foto da placa do veículo"
+                  >
+                    <Ionicons name="camera" size={20} color="#38BDF8" />
+                  </TouchableOpacity>
                   {buscandoVeiculo && (
                     <ActivityIndicator size="small" color={CORES.primariaClara} style={{ marginRight: 8 }} />
                   )}
@@ -363,6 +388,30 @@ export const ModalNovaOS: React.FC<ModalNovaOSProps> = ({
                     </Text>
                   </View>
 
+                  
+                  {/* Atalho para Cadastro Completo de Veículo */}
+                  <TouchableOpacity
+                    style={styles.botaoCadastroCompletoVeiculo}
+                    activeOpacity={0.85}
+                    onPress={() => setModalCadastroVeiculoVisivel(true)}
+                  >
+                    <View style={styles.botaoCadastroCompletoIcone}>
+                      <Ionicons name="car-sport" size={18} color="#38BDF8" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.botaoCadastroCompletoTitulo}>Abrir Cadastro Completo de Veículo</Text>
+                      <Text style={styles.botaoCadastroCompletoSubtitulo}>
+                        Vincular cliente existente, ano/modelo, cor e km com 1 toque
+                      </Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color="#38BDF8" />
+                  </TouchableOpacity>
+
+                  <View style={styles.divisorOu}>
+                    <View style={styles.linhaDivisoria} />
+                    <Text style={styles.textoOu}>OU PREENCHA RÁPIDO ABAIXO</Text>
+                    <View style={styles.linhaDivisoria} />
+                  </View>
                   <View style={styles.campoContainer}>
                     <Text style={styles.rotuloCampo}>MODELO DO CARRO *</Text>
                     <TextInput
@@ -548,10 +597,82 @@ export const ModalNovaOS: React.FC<ModalNovaOSProps> = ({
         </View>
       </KeyboardAvoidingView>
     </Modal>
+      {/* Modal para Cadastro Completo de Veículo */}
+      <ModalCadastroVeiculo
+        visivel={modalCadastroVeiculoVisivel}
+        aoFechar={() => setModalCadastroVeiculoVisivel(false)}
+        placaInicial={placaTexto}
+        aoSalvar={(veiculoCriado) => {
+          setVeiculoEncontrado(veiculoCriado);
+          setVeiculoNaoEncontrado(false);
+          setPlacaTexto(veiculoCriado.placa);
+          if (veiculoCriado.kmAtual) {
+            setKmEntrada(String(veiculoCriado.kmAtual));
+          }
+        }}
+      />
+      {/* Modal de Câmera OCR para Reconhecer Placa */}
+      <ModalCapturaFotoPlaca
+        visivel={modalFotoPlacaVisivel}
+        aoFechar={() => setModalFotoPlacaVisivel(false)}
+        aoPlacaDetectada={(placaLida) => {
+          setPlacaTexto(placaLida);
+          pesquisarPlaca(placaLida);
+        }}
+      />
+
+    </>
+
   );
 };
 
 const styles = StyleSheet.create({
+    botaoCadastroCompletoVeiculo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(56, 189, 248, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.4)',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    gap: 10,
+  },
+  botaoCadastroCompletoIcone: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    backgroundColor: 'rgba(56, 189, 248, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  botaoCadastroCompletoTitulo: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#38BDF8',
+  },
+  botaoCadastroCompletoSubtitulo: {
+    fontSize: 11,
+    color: CORES.textoSecundario,
+    marginTop: 1,
+  },
+  divisorOu: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 12,
+  },
+  linhaDivisoria: {
+    flex: 1,
+    height: 1,
+    backgroundColor: CORES.bordaSuave,
+  },
+  textoOu: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: CORES.textoMudo,
+    letterSpacing: 0.5,
+  },
   fundoModal: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
@@ -618,6 +739,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.5,
     marginBottom: 6,
+  },
+    botaoCameraPlacaOS: {
+    padding: 6,
+    marginRight: 6,
+    borderRadius: 8,
+    backgroundColor: 'rgba(56, 189, 248, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   inputPlacaLinha: {
     flexDirection: 'row',

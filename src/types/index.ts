@@ -368,10 +368,27 @@ export interface RespostaCliente {
   ativo?: boolean;
 }
 
+export interface RespostaServico {
+  id: string;
+  nome: string;
+  categoria?: string;
+  valorMaoObra: number;
+  tempoPadraoHoras?: number;
+  ativo?: boolean;
+}
+
+export interface PedidoServico {
+  nome: string;
+  categoria?: string;
+  valorMaoObra?: number;
+  tempoPadraoHoras?: number;
+}
+
 export interface PedidoCriarCliente {
   tipo: 'pf' | 'pj';
   nome: string;
   documento?: string;
+  email?: string;
   contatos?: {
     nome: string;
     telefone: string;
@@ -480,4 +497,11 @@ export interface PedidoFecharVenda {
   autorizacaoCartao?: string;
   autorizacaoCreditoId?: string | null;
   observacoes?: string;
+}
+
+export interface SolicitacaoCadastro {
+  nomeOficina: string;
+  email: string;
+  whatsapp: string;
+  dataSolicitacao?: string;
 }

@@ -6,6 +6,11 @@ export const CONFIG_STORAGE_KEYS = {
   OFICINA_ATIVA: 'af_gestao_oficina_ativa',
   OFICINAS_DISPONIVEIS: 'af_gestao_oficinas_disponiveis',
   API_BASE_URL: 'af_gestao_api_base_url',
+  BIOMETRIA_ATIVADA: 'af_gestao_biometria_ativada',
+  BIOMETRIA_ULTIMO_EMAIL: 'af_gestao_biometria_ultimo_email',
+  BIOMETRIA_ULTIMO_NOME: 'af_gestao_biometria_ultimo_nome',
+  BIOMETRIA_CREDENCIAL: 'af_gestao_biometria_credencial',
+  BIOMETRIA_DISPENSADA: 'af_gestao_biometria_dispensada',
 };
 
 // URL padrão para a API backend (Nuvem Produção Oficial)

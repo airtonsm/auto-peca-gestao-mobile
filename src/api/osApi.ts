@@ -66,6 +66,38 @@ export const osApi = {
   },
 
   /**
+   * Consulta os dados do veículo pela placa no backend da plataforma (FIPE/Denatran).
+   * Rota: POST /api/placas/{placa}/consultar
+   */
+  async consultarPlaca(placa: string): Promise<{
+    placa: string;
+    encontrado: boolean;
+    origem?: string;
+    veiculo?: {
+      marca?: string;
+      modelo?: string;
+      versao?: string;
+      anoFabricacao?: number;
+      anoModelo?: number;
+      motor?: string;
+      combustivel?: string;
+    };
+    veiculoId?: string;
+    mensagem?: string;
+  } | null> {
+    const limpa = (placa || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    if (!limpa || limpa.length < 7) return null;
+    try {
+      const response = await clienteHttp.post(`/api/placas/${limpa}/consultar`, {
+        origemTipo: 'veiculo',
+      });
+      return response.data;
+    } catch {
+      return null;
+    }
+  },
+
+  /**
    * Cadastra um novo veículo vinculado a um cliente.
    * Rota: POST /api/veiculos
    */
@@ -106,5 +138,14 @@ export const osApi = {
     } catch {
       return [];
     }
+  },
+
+  /**
+   * Fatura a Ordem de Serviço, registrando o pagamento e concluindo a entrega.
+   * Rota: POST /api/os/{osId}/faturar
+   */
+  async faturarOS(osId: string, pedido: any): Promise<any> {
+    const response = await clienteHttp.post(`/api/os/${osId}/faturar`, pedido);
+    return response.data;
   },
 };
